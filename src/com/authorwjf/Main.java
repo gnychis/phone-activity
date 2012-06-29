@@ -5,6 +5,7 @@ import java.util.List;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -14,7 +15,6 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.ImageView;
 import android.widget.Spinner;
 
 public class Main extends Activity implements SensorEventListener {
@@ -23,15 +23,17 @@ public class Main extends Activity implements SensorEventListener {
 	private boolean mInitialized;
 	private SensorManager mSensorManager;
     private Sensor mAccelerometer;
-    private final float NOISE = (float) 0.5;
+    private final float NOISE = (float) 0.25;
     WifiManager wifi;
     Spinner netlist;
+    View theView;
 	 
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
+        theView = findViewById(R.id.main_id);
         mInitialized = false;
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -46,7 +48,6 @@ public class Main extends Activity implements SensorEventListener {
         	spinnerArray.add(config.SSID);
         ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, spinnerArray);
         netlist.setAdapter(spinnerArrayAdapter);
-       
     }
 
     protected void onResume() {
@@ -66,7 +67,6 @@ public class Main extends Activity implements SensorEventListener {
 
 	@Override
 	public void onSensorChanged(SensorEvent event) {
-		ImageView iv = (ImageView)findViewById(R.id.image);
 		float x = event.values[0];
 		float y = event.values[1];
 		float z = event.values[2];
@@ -85,13 +85,13 @@ public class Main extends Activity implements SensorEventListener {
 			mLastX = x;
 			mLastY = y;
 			mLastZ = z;
-			iv.setVisibility(View.VISIBLE);
-			if (deltaX > deltaY) {
-				iv.setImageResource(R.drawable.horizontal);
-			} else if (deltaY > deltaX) {
-				iv.setImageResource(R.drawable.vertical);
+			
+			if (deltaX > deltaY) {  // We moved horizontally
+				theView.setBackgroundColor(Color.RED);
+			} else if (deltaY > deltaX) {  // We moved vertically
+				theView.setBackgroundColor(Color.RED);
 			} else {
-				iv.setVisibility(View.INVISIBLE);
+				 theView.setBackgroundColor(Color.BLACK);
 			}
 		}
 	}
