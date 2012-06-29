@@ -22,6 +22,9 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
+import android.widget.Toast;
+
+import com.gnychis.PhoneActivity.R;
 
 public class Main extends Activity implements SensorEventListener {
 	
@@ -85,17 +88,30 @@ public class Main extends Activity implements SensorEventListener {
             @Override
             public void onReceive(Context c, Intent intent) 
             {
-               scan_result = wifi.getScanResults();
-               if(home_ssid==null)
-            	   return;
-               int homenet_in_list=0;
-               for(ScanResult result : scan_result)
-            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
-            		   homenet_in_list=1;
-               
-               user_is_home=homenet_in_list;
+            	if(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(intent.getAction())) {
+	               scan_result = wifi.getScanResults();
+	               if(home_ssid==null)
+	            	   return;
+	               int homenet_in_list=0;
+	               for(ScanResult result : scan_result)
+	            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
+	            		   homenet_in_list=1;
+	               
+	               user_is_home=homenet_in_list;
+            	}
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));   
+        
+        registerReceiver(new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context c, Intent intent) 
+            {
+            	if("android.intent.action.BOOT_COMPLETED".equals(intent.getAction())) {
+            		Toast.makeText(getApplicationContext(), "Got the boot complete...", Toast.LENGTH_LONG).show();	
+            	}
+            }
+        }, new IntentFilter("android.intent.action.BOOT_COMPLETED"));           
     }
     
     public void clickedFinished(View v) {
