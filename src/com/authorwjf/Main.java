@@ -1,6 +1,8 @@
 package com.authorwjf;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import android.app.Activity;
@@ -26,8 +28,20 @@ public class Main extends Activity implements SensorEventListener {
     private final float NOISE = (float) 0.25;
     WifiManager wifi;
     Spinner netlist;
+    Spinner agelist;
     View theView;
 	 
+    Comparator<Object> netsort = new Comparator<Object>() {
+    	public int compare(Object arg0, Object arg1) {
+    		if(((WifiConfiguration)arg0).priority < ((WifiConfiguration)arg1).priority)
+    			return 1;
+    		else if( ((WifiConfiguration)arg0).priority > ((WifiConfiguration)arg1).priority)
+    			return -1;
+    		else
+    			return 0;
+    	}
+      };
+    
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -44,10 +58,18 @@ public class Main extends Activity implements SensorEventListener {
         List<WifiConfiguration> cfgNets = wifi.getConfiguredNetworks();
         netlist = (Spinner) findViewById(R.id.network_list);
         ArrayList<String> spinnerArray = new ArrayList<String>();
+        Collections.sort(cfgNets,netsort);
         for (WifiConfiguration config: cfgNets)
-        	spinnerArray.add(config.SSID);
-        ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, spinnerArray);
+        	spinnerArray.add(config.SSID.replaceAll("^\"|\"$", ""));
+        ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, spinnerArray);
+        spinnerArrayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         netlist.setAdapter(spinnerArrayAdapter);
+        
+        // Setup the age list
+        agelist = (Spinner) findViewById(R.id.age_group);
+        ArrayAdapter<CharSequence> ageAdapter = ArrayAdapter.createFromResource(this, R.array.age_ranges, android.R.layout.simple_spinner_item);
+        ageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        agelist.setAdapter(ageAdapter);
     }
 
     protected void onResume() {
