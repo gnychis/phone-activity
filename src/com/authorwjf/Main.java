@@ -1,15 +1,21 @@
 package com.authorwjf;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import android.app.Activity;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.ImageView;
-import android.widget.TextView;
+import android.widget.Spinner;
 
 public class Main extends Activity implements SensorEventListener {
 	
@@ -18,6 +24,8 @@ public class Main extends Activity implements SensorEventListener {
 	private SensorManager mSensorManager;
     private Sensor mAccelerometer;
     private final float NOISE = (float) 0.5;
+    WifiManager wifi;
+    Spinner netlist;
 	 
     /** Called when the activity is first created. */
     @Override
@@ -28,6 +36,17 @@ public class Main extends Activity implements SensorEventListener {
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mSensorManager.registerListener(this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+        
+        // Get the list of configured networks and add them to the spinner
+        wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        List<WifiConfiguration> cfgNets = wifi.getConfiguredNetworks();
+        netlist = (Spinner) findViewById(R.id.network_list);
+        ArrayList<String> spinnerArray = new ArrayList<String>();
+        for (WifiConfiguration config: cfgNets)
+        	spinnerArray.add(config.SSID);
+        ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, spinnerArray);
+        netlist.setAdapter(spinnerArrayAdapter);
+       
     }
 
     protected void onResume() {
@@ -47,9 +66,6 @@ public class Main extends Activity implements SensorEventListener {
 
 	@Override
 	public void onSensorChanged(SensorEvent event) {
-		TextView tvX= (TextView)findViewById(R.id.x_axis);
-		TextView tvY= (TextView)findViewById(R.id.y_axis);
-		TextView tvZ= (TextView)findViewById(R.id.z_axis);
 		ImageView iv = (ImageView)findViewById(R.id.image);
 		float x = event.values[0];
 		float y = event.values[1];
@@ -58,9 +74,6 @@ public class Main extends Activity implements SensorEventListener {
 			mLastX = x;
 			mLastY = y;
 			mLastZ = z;
-			tvX.setText("0.0");
-			tvY.setText("0.0");
-			tvZ.setText("0.0");
 			mInitialized = true;
 		} else {
 			float deltaX = Math.abs(mLastX - x);
@@ -72,9 +85,6 @@ public class Main extends Activity implements SensorEventListener {
 			mLastX = x;
 			mLastY = y;
 			mLastZ = z;
-			tvX.setText(Float.toString(deltaX));
-			tvY.setText(Float.toString(deltaY));
-			tvZ.setText(Float.toString(deltaZ));
 			iv.setVisibility(View.VISIBLE);
 			if (deltaX > deltaY) {
 				iv.setImageResource(R.drawable.horizontal);
