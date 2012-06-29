@@ -37,6 +37,7 @@
 	    android:layout_height="wrap_content"
 	    android:layout_gravity="right"
 	    android:layout_marginTop="40sp"
+	    android:onClick="clickedFinished"
 	    android:text="I&apos;ve selected my age and network!" />
 
 </LinearLayout>

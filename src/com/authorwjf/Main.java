@@ -6,12 +6,16 @@ import java.util.Comparator;
 import java.util.List;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -30,6 +34,9 @@ public class Main extends Activity implements SensorEventListener {
     Spinner netlist;
     Spinner agelist;
     View theView;
+    List<ScanResult> scan_result;
+    int user_is_home=0;
+    String home_ssid;
 	 
     Comparator<Object> netsort = new Comparator<Object>() {
     	public int compare(Object arg0, Object arg1) {
@@ -70,6 +77,33 @@ public class Main extends Activity implements SensorEventListener {
         ArrayAdapter<CharSequence> ageAdapter = ArrayAdapter.createFromResource(this, R.array.age_ranges, android.R.layout.simple_spinner_item);
         ageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         agelist.setAdapter(ageAdapter);
+        
+        // Create a broadcast receiver to listen for wifi scan results. We don't invoke them, we only passively
+        // listen whenever they become available.
+        registerReceiver(new BroadcastReceiver()
+        {
+            @Override
+            public void onReceive(Context c, Intent intent) 
+            {
+               scan_result = wifi.getScanResults();
+               if(home_ssid==null)
+            	   return;
+               int homenet_in_list=0;
+               for(ScanResult result : scan_result)
+            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
+            		   homenet_in_list=1;
+               
+               user_is_home=homenet_in_list;
+            }
+        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));   
+    }
+    
+    public void clickedFinished(View v) {
+    	
+    	// Get the string representations of the selected items
+    	home_ssid = (String) netlist.getSelectedItem();
+    	String selected_age = (String) agelist.getSelectedItem();
+
     }
 
     protected void onResume() {
@@ -113,7 +147,10 @@ public class Main extends Activity implements SensorEventListener {
 			} else if (deltaY > deltaX) {  // We moved vertically
 				theView.setBackgroundColor(Color.RED);
 			} else {
-				 theView.setBackgroundColor(Color.BLACK);
+				if(user_is_home==1)
+					theView.setBackgroundColor(Color.BLUE);
+				else
+					theView.setBackgroundColor(Color.BLACK);
 			}
 		}
 	}
