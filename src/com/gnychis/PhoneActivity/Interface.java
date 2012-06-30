@@ -6,6 +6,16 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.protocol.HTTP;
+import org.json.JSONObject;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -13,32 +23,24 @@ import android.content.SharedPreferences;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.util.Log;
+import android.os.Looper;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.Spinner;
 
 public class Interface extends Activity {
 	
-    Spinner netlist;
-    Spinner agelist;
+    Spinner netlist, agelist;
     View theView;
     String home_ssid;
     WifiManager wifi;
+    SharedPreferences.Editor sEditor;
+    SharedPreferences settings;
+    CheckBox kitchen, livingRoom, bedroom, bathroom;
     
     public static final String PREFS_NAME = "PhoneActivityPrefs";
-	 
-    Comparator<Object> netsort = new Comparator<Object>() {
-    	public int compare(Object arg0, Object arg1) {
-    		if(((WifiConfiguration)arg0).priority < ((WifiConfiguration)arg1).priority)
-    			return 1;
-    		else if( ((WifiConfiguration)arg0).priority > ((WifiConfiguration)arg1).priority)
-    			return -1;
-    		else
-    			return 0;
-    	}
-      };
-    
+
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -47,32 +49,28 @@ public class Interface extends Activity {
         setContentView(R.layout.main);
         theView = findViewById(R.id.main_id);
         
-        // There are 3 pieces of information that are saved about you.  A random integer
-        // so that I can have a unique ID for each participant.  Then, your home network
-        // name which is NEVER phoned home to me, but your age range is.
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-        SharedPreferences.Editor sEditor = settings.edit();
+        // Check if the user already selected some of this information in the application's
+        // preferences.  If so, we put their information back so they don't reselect it.
+        settings = getSharedPreferences(PREFS_NAME, 0);
+        sEditor = settings.edit();
         int sRandClientID = settings.getInt("randClientID",-1);
         String sHomeSSID = settings.getString("homeSSID", null);
-        String sAgeRange = settings.getString("ageRange", null);
+        int sAgeRange = settings.getInt("ageRange", -1);
         
         // So that you remain anonymous, but I can have a unique ID for your data,
         // I generate a random integer and use it as your ID then store it.
         if(sRandClientID==-1) {
-        	int randInt = new Random().nextInt(Integer.MAX_VALUE);
-        	sEditor.putInt("randClientID", randInt);
+        	sRandClientID = new Random().nextInt(Integer.MAX_VALUE);
+        	sEditor.putInt("randClientID", sRandClientID);
         	sEditor.commit();
-        	sRandClientID = randInt;
-        	Log.d(getClass().getSimpleName(), "Setting the user ID to " + Integer.toString(sRandClientID));
-        } else {
-        	Log.d(getClass().getSimpleName(), "The user ID is " + Integer.toString(sRandClientID));
         }
         
         // Create the service that runs in the background and captures the activity data
         ActivityService.setMainActivity(this);
         startService(new Intent(this, ActivityService.class));
         
-        // Get the list of configured networks and add them to the spinner
+        // Gets the list of networks on their phone and puts them in to a drop-down menu
+        // for them to select their home network from.
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         List<WifiConfiguration> cfgNets = wifi.getConfiguredNetworks();
         netlist = (Spinner) findViewById(R.id.network_list);
@@ -84,19 +82,93 @@ public class Interface extends Activity {
         spinnerArrayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         netlist.setAdapter(spinnerArrayAdapter);
         
-        // Setup the age list
+        // Setup the age-range list and put it in a drop-down menu for them to select.
         agelist = (Spinner) findViewById(R.id.age_group);
         ArrayAdapter<CharSequence> ageAdapter = ArrayAdapter.createFromResource(this, R.array.age_ranges, android.R.layout.simple_spinner_item);
         ageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        agelist.setAdapter(ageAdapter);       
+        agelist.setAdapter(ageAdapter);
+        
+        // If the user already selected their age range and home network, bring them up so that
+        // they don't think they have to reselect them.
+        if(sHomeSSID!=null)
+        	netlist.setSelection(spinnerArray.indexOf(sHomeSSID));    
+        if(sAgeRange!=-1)
+        	agelist.setSelection(sAgeRange);
+        
+        // Set the checkboxes back to what the user had
+        ((CheckBox) findViewById(R.id.kitchen)).setChecked((settings.getInt("kitchen",0)==0) ? false : true);
+        ((CheckBox) findViewById(R.id.bedroom)).setChecked((settings.getInt("bedroom",0)==0) ? false : true);
+        ((CheckBox) findViewById(R.id.livingRoom)).setChecked((settings.getInt("livingRoom",0)==0) ? false : true);
+        ((CheckBox) findViewById(R.id.bathroom)).setChecked((settings.getInt("bathroom",0)==0) ? false : true);
+        ((CheckBox) findViewById(R.id.everywhere)).setChecked((settings.getInt("everywhere",0)==0) ? false : true);
+
     }
     
+    // When the user clicks finished, we save some information locally, only some of this information
+    // is anonymously shared with us!
     public void clickedFinished(View v) {
-    	// Get the string representations of the selected items
     	home_ssid = (String) netlist.getSelectedItem();
-    	String selected_age = (String) agelist.getSelectedItem();
+    	int selected_age_id = (int) agelist.getSelectedItemId();
+    	sEditor.putString("homeSSID", home_ssid);
+    	sEditor.putInt("ageRange", selected_age_id);
+    	sEditor.putInt("kitchen", (((CheckBox) findViewById(R.id.kitchen)).isChecked()==true) ? 1 : 0);
+    	sEditor.putInt("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);
+    	sEditor.putInt("livingRoom", (((CheckBox) findViewById(R.id.livingRoom)).isChecked()==true) ? 1 : 0);
+    	sEditor.putInt("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
+    	sEditor.putInt("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);
+    	sEditor.commit();
+    	retrieveUserData();
     	finish();
     }
+    
+    protected void retrieveUserData() {
+        Thread t = new Thread(){
+        public void run() {
+                Looper.prepare(); // For Preparing Message Pool for the child Thread
+                HttpClient client = new DefaultHttpClient();
+                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
+                HttpResponse response;
+                JSONObject json = new JSONObject();
+                try{
+                    HttpPost post = new HttpPost("http://g.nychis.com/userdata.php");
+                    
+                    // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
+                    json.put("clientID", settings.getInt("randClientID",-1));
+                    json.put("ageRange", agelist.getSelectedItemId());
+                    json.put("kitchen", (((CheckBox) findViewById(R.id.kitchen)).isChecked()==true) ? 1 : 0);
+                    json.put("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);
+                    json.put("livingRoom", (((CheckBox) findViewById(R.id.livingRoom)).isChecked()==true) ? 1 : 0);
+                    json.put("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
+                    json.put("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);          
+                    
+                    StringEntity se = new StringEntity( json.toString());  
+                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
+                    post.setEntity(se);
+                    response = client.execute(post);
+                }
+                catch(Exception e){
+
+                }
+                Looper.loop(); //Loop in the message queue
+            }
+        };
+        t.start();      
+    }
+
+	 
+    // This is a comparator to sort the networks on your phone, so that your home network is
+    // more likely to be at the top of the list.
+    Comparator<Object> netsort = new Comparator<Object>() {
+    	public int compare(Object arg0, Object arg1) {
+    		if(((WifiConfiguration)arg0).priority < ((WifiConfiguration)arg1).priority)
+    			return 1;
+    		else if( ((WifiConfiguration)arg0).priority > ((WifiConfiguration)arg1).priority)
+    			return -1;
+    		else
+    			return 0;
+    	}
+      };
+    
 
     protected void onResume() {
         super.onResume();

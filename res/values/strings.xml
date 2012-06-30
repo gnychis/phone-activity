@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Activity Monitor</string>
+    <string name="app_name">Home Activity Study</string>
     <string-array name="age_ranges">
+        <item>…</item>
         <item>0–17</item>
         <item>18–24</item>
         <item>25–34</item>
