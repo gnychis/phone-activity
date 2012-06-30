@@ -1,5 +1,9 @@
 package com.gnychis.PhoneActivity;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -24,9 +28,12 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Looper;
+import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.Spinner;
 
 public class Interface extends Activity {
@@ -101,6 +108,18 @@ public class Interface extends Activity {
         ((CheckBox) findViewById(R.id.livingRoom)).setChecked((settings.getInt("livingRoom",0)==0) ? false : true);
         ((CheckBox) findViewById(R.id.bathroom)).setChecked((settings.getInt("bathroom",0)==0) ? false : true);
         ((CheckBox) findViewById(R.id.everywhere)).setChecked((settings.getInt("everywhere",0)==0) ? false : true);
+        
+        // If the user puts a "checkmark" in the Everywhere option, we check all other boxes.
+        ((CheckBox) findViewById(R.id.everywhere)).setOnCheckedChangeListener(new OnCheckedChangeListener() {
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if ( isChecked ) {
+                	 ((CheckBox) findViewById(R.id.kitchen)).setChecked(true);
+                	 ((CheckBox) findViewById(R.id.bedroom)).setChecked(true);
+                	 ((CheckBox) findViewById(R.id.livingRoom)).setChecked(true);
+                	 ((CheckBox) findViewById(R.id.bathroom)).setChecked(true);
+                }
+            }
+        });
 
     }
     
@@ -117,11 +136,11 @@ public class Interface extends Activity {
     	sEditor.putInt("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
     	sEditor.putInt("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);
     	sEditor.commit();
-    	retrieveUserData();
+    	sendUserData();
     	finish();
     }
     
-    protected void retrieveUserData() {
+    protected void sendUserData() {
         Thread t = new Thread(){
         public void run() {
                 Looper.prepare(); // For Preparing Message Pool for the child Thread
@@ -133,18 +152,26 @@ public class Interface extends Activity {
                     HttpPost post = new HttpPost("http://g.nychis.com/userdata.php");
                     
                     // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
+                    // Note that your home network name is never sent to us.
                     json.put("clientID", settings.getInt("randClientID",-1));
+                    Log.d(getClass().getSimpleName(), "the client ID is: " + Integer.toString(settings.getInt("randClientID",-1)));
                     json.put("ageRange", agelist.getSelectedItemId());
                     json.put("kitchen", (((CheckBox) findViewById(R.id.kitchen)).isChecked()==true) ? 1 : 0);
                     json.put("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);
                     json.put("livingRoom", (((CheckBox) findViewById(R.id.livingRoom)).isChecked()==true) ? 1 : 0);
                     json.put("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
-                    json.put("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);          
+                    json.put("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);    
+                     
                     
                     StringEntity se = new StringEntity( json.toString());  
                     se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
                     post.setEntity(se);
                     response = client.execute(post);
+                    if(response!=null) {
+                        InputStream in = response.getEntity().getContent();
+                        String a = convertStreamToString(in);
+                        sleep(1);
+                    }
                 }
                 catch(Exception e){
 
@@ -169,6 +196,27 @@ public class Interface extends Activity {
     	}
       };
     
+      private static String convertStreamToString(InputStream is) {
+
+    	    BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+    	    StringBuilder sb = new StringBuilder();
+
+    	    String line = null;
+    	    try {
+    	        while ((line = reader.readLine()) != null) {
+    	            sb.append(line + "\n");
+    	        }
+    	    } catch (IOException e) {
+    	        e.printStackTrace();
+    	    } finally {
+    	        try {
+    	            is.close();
+    	        } catch (IOException e) {
+    	            e.printStackTrace();
+    	        }
+    	    }
+    	    return sb.toString();
+    	}
 
     protected void onResume() {
         super.onResume();
