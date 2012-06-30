@@ -120,6 +120,8 @@ public class Interface extends Activity {
                 }
             }
         });
+        
+        wifi.startScan();
     }
     
     // When the user clicks finished, we save some information locally, only some of this information
@@ -136,6 +138,7 @@ public class Interface extends Activity {
     	sEditor.putInt("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);
     	sEditor.commit();
     	sendUserData();
+    	wifi.startScan();
     	finish();
     }
     

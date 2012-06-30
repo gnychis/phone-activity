@@ -22,6 +22,7 @@ import android.widget.Toast;
 public class ActivityService extends Service implements SensorEventListener {
 	
     public static Interface mMainActivity;
+    private final boolean DEBUG=true;
 
 	private float mLastX, mLastY, mLastZ;
 	private boolean mInitialized;
@@ -82,8 +83,10 @@ public class ActivityService extends Service implements SensorEventListener {
 	            	   mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
 	               
 	               // The user has left home, we need to unregister it
-	               if(user_is_home==1 && homenet_in_list==0)
+	               if(user_is_home==1 && homenet_in_list==0) {
 	            	   mSensorManager.unregisterListener(_this);
+	            	   if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
+	               }
 	               
 	               user_is_home=homenet_in_list;
 	               //Log.d(getClass().getSimpleName(), "Got a scan result, user_is_home: " + Integer.toString(user_is_home));
@@ -102,14 +105,12 @@ public class ActivityService extends Service implements SensorEventListener {
             }
         }, new IntentFilter("android.intent.action.BOOT_COMPLETED"));    
         
-        if (mMainActivity != null)  Log.d(getClass().getSimpleName(), "ActivityService started in the background");
     }
     
     @Override
     public void onDestroy() {
     	super.onDestroy();
     	mSensorManager.unregisterListener(this);
-    	if (mMainActivity != null)  Log.d(getClass().getSimpleName(), "ActivityService stopped, no longer running in the background");
     }
     
     @Override
@@ -148,11 +149,11 @@ public class ActivityService extends Service implements SensorEventListener {
 			mLastZ = z;
 			
 			if (deltaX > deltaY) {  // We moved horizontally
-				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.RED);
+				if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.RED);
 			} else if (deltaY > deltaX) {  // We moved vertically
-				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.RED);
+				if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.RED);
 			} else {
-				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.BLACK);
+				if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
 			}
 		}
 	}
