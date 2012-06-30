@@ -58,14 +58,17 @@ public class ActivityService extends Service implements SensorEventListener {
             {
             	if(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(intent.getAction())) {
 	               scan_result = wifi.getScanResults();
-	               if(home_ssid==null)
+	               if(home_ssid==null) {
+	            	   Log.d(getClass().getSimpleName(), "Got a scan result, user_is_home: " + Integer.toString(user_is_home));
 	            	   return;
+	               }
 	               int homenet_in_list=0;
 	               for(ScanResult result : scan_result)
 	            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
 	            		   homenet_in_list=1;
 	               
 	               user_is_home=homenet_in_list;
+	               //Log.d(getClass().getSimpleName(), "Got a scan result, user_is_home: " + Integer.toString(user_is_home));
             	}
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));   
@@ -127,14 +130,15 @@ public class ActivityService extends Service implements SensorEventListener {
 			mLastZ = z;
 			
 			if (deltaX > deltaY) {  // We moved horizontally
-				mMainActivity.theView.setBackgroundColor(Color.RED);
+				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.RED);
 			} else if (deltaY > deltaX) {  // We moved vertically
-				mMainActivity.theView.setBackgroundColor(Color.RED);
+				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.RED);
 			} else {
-				if(user_is_home==1)
-					mMainActivity.theView.setBackgroundColor(Color.BLUE);
-				else
-					mMainActivity.theView.setBackgroundColor(Color.BLACK);
+				if(user_is_home==1) {
+					if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.BLUE);
+				} else {
+					if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.BLACK);
+				}
 			}
 		}
 	}
