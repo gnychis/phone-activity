@@ -120,7 +120,6 @@ public class Interface extends Activity {
                 }
             }
         });
-
     }
     
     // When the user clicks finished, we save some information locally, only some of this information
@@ -154,7 +153,6 @@ public class Interface extends Activity {
                     // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
                     // Note that your home network name is never sent to us.
                     json.put("clientID", settings.getInt("randClientID",-1));
-                    Log.d(getClass().getSimpleName(), "the client ID is: " + Integer.toString(settings.getInt("randClientID",-1)));
                     json.put("ageRange", agelist.getSelectedItemId());
                     json.put("kitchen", (((CheckBox) findViewById(R.id.kitchen)).isChecked()==true) ? 1 : 0);
                     json.put("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);

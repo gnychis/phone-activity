@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -27,6 +28,10 @@ public class ActivityService extends Service implements SensorEventListener {
 	private SensorManager mSensorManager;
     private Sensor mAccelerometer;
     private final float NOISE = (float) 0.25;
+    
+    ActivityService _this;
+    public static final String PREFS_NAME = "PhoneActivityPrefs";
+    SharedPreferences settings;
 
     WifiManager wifi;
     int user_is_home=0;
@@ -41,13 +46,16 @@ public class ActivityService extends Service implements SensorEventListener {
     @Override
     public void onCreate() {
     	super.onCreate();
+    	_this=this;
     	
+    	settings = getSharedPreferences(PREFS_NAME, 0);
+    	    	
         mInitialized = false;
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        mSensorManager.registerListener(this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
         
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+       //mSensorManager.registerListener(this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
         
         // Create a broadcast receiver to listen for wifi scan results. We don't invoke them, we only passively
         // listen whenever they become available.
@@ -58,14 +66,24 @@ public class ActivityService extends Service implements SensorEventListener {
             {
             	if(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(intent.getAction())) {
 	               scan_result = wifi.getScanResults();
-	               if(home_ssid==null) {
-	            	   Log.d(getClass().getSimpleName(), "Got a scan result, user_is_home: " + Integer.toString(user_is_home));
+	               
+	               home_ssid = settings.getString("homeSSID", null);
+	            	   
+	               if(home_ssid==null) // If it is still null, then the user still hasn't set it
 	            	   return;
-	               }
+	               
 	               int homenet_in_list=0;
 	               for(ScanResult result : scan_result)
 	            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
 	            		   homenet_in_list=1;
+	               
+	               // The user is now home, we need to register the sensor listener
+	               if(user_is_home==0 && homenet_in_list==1)
+	            	   mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+	               
+	               // The user has left home, we need to unregister it
+	               if(user_is_home==1 && homenet_in_list==0)
+	            	   mSensorManager.unregisterListener(_this);
 	               
 	               user_is_home=homenet_in_list;
 	               //Log.d(getClass().getSimpleName(), "Got a scan result, user_is_home: " + Integer.toString(user_is_home));
@@ -134,11 +152,7 @@ public class ActivityService extends Service implements SensorEventListener {
 			} else if (deltaY > deltaX) {  // We moved vertically
 				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.RED);
 			} else {
-				if(user_is_home==1) {
-					if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.BLUE);
-				} else {
-					if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.BLACK);
-				}
+				if(mMainActivity!=null) mMainActivity.theView.setBackgroundColor(Color.BLACK);
 			}
 		}
 	}
