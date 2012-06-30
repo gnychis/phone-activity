@@ -1,4 +1,4 @@
-package com.authorwjf;
+package com.gnychis.ActivityService;
 
 import java.util.List;
 
