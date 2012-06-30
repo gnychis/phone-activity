@@ -71,6 +71,7 @@ public class Interface extends Activity {
     	// Get the string representations of the selected items
     	home_ssid = (String) netlist.getSelectedItem();
     	String selected_age = (String) agelist.getSelectedItem();
+    	finish();
     }
 
     protected void onResume() {
