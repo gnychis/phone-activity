@@ -45,6 +45,7 @@ public class Interface extends Activity {
         theView = findViewById(R.id.main_id);
         
         // Create the service that runs in the background and captures the activity data
+        ActivityService.setMainActivity(this);
         final Intent activityService = new Intent(this, ActivityService.class);
         startService(activityService);
         

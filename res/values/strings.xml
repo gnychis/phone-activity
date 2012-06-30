@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hello">Hello World, Main!</string>
-    <string name="app_name">Shaker</string>
+    <string name="app_name">Activity Monitor</string>
     <string-array name="age_ranges">
         <item>0–17</item>
         <item>18–24</item>

@@ -35,6 +35,7 @@ public class ActivityService extends Service implements SensorEventListener {
     
     @Override
     public void onCreate() {
+    	Log.d(getClass().getSimpleName(), "ActivityService started in the background??????");
     	super.onCreate();
     	
         mInitialized = false;
@@ -76,14 +77,14 @@ public class ActivityService extends Service implements SensorEventListener {
             }
         }, new IntentFilter("android.intent.action.BOOT_COMPLETED"));    
         
-        if (mMainActivity != null)  Log.d(getClass().getSimpleName(), "ActivityService started");
+        if (mMainActivity != null)  Log.d(getClass().getSimpleName(), "ActivityService started in the background");
     }
     
     @Override
     public void onDestroy() {
     	super.onDestroy();
     	mSensorManager.unregisterListener(this);
-    	if (mMainActivity != null)  Log.d(getClass().getSimpleName(), "ActivityService stopped");
+    	if (mMainActivity != null)  Log.d(getClass().getSimpleName(), "ActivityService stopped, no longer running in the background");
     }
     
     @Override
