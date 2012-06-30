@@ -1,4 +1,4 @@
-package com.gnychis.ActivityService;
+package com.gnychis.PhoneActivity;
 
 import java.util.List;
 
@@ -34,8 +34,12 @@ public class ActivityService extends Service implements SensorEventListener {
     String home_ssid;
     
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return 1;
+    }
+    
+    @Override
     public void onCreate() {
-    	Log.d(getClass().getSimpleName(), "ActivityService started in the background??????");
     	super.onCreate();
     	
         mInitialized = false;

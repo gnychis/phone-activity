@@ -1,4 +1,4 @@
-package com.gnychis.ActivityService;
+package com.gnychis.PhoneActivity;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,8 +46,7 @@ public class Interface extends Activity {
         
         // Create the service that runs in the background and captures the activity data
         ActivityService.setMainActivity(this);
-        final Intent activityService = new Intent(this, ActivityService.class);
-        startService(activityService);
+        startService(new Intent(this, ActivityService.class));
         
         // Get the list of configured networks and add them to the spinner
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
