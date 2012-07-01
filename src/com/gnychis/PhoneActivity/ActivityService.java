@@ -20,8 +20,6 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.util.Log;
-import android.widget.Toast;
 
 public class ActivityService extends Service implements SensorEventListener {
 	
@@ -34,10 +32,12 @@ public class ActivityService extends Service implements SensorEventListener {
     private Sensor mAccelerometer;
     private final float NOISE = (float) 0.25;
     
-    ActivityService _this;
+    static ActivityService _this;
     public static final String PREFS_NAME = "PhoneActivityPrefs";
     SharedPreferences settings;
     SharedPreferences.Editor sEditor;
+    
+    public boolean mDisableWifiAS;
     
     // Used to keep the location of the home so that we know when the user is home.
     // However, we NEVER retrieve this information from the phone.  Your home location
@@ -70,6 +70,7 @@ public class ActivityService extends Service implements SensorEventListener {
     	    	
         mInitialized = false;
     	mNextLocIsHome=false;
+    	mDisableWifiAS=false;
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         
@@ -116,6 +117,12 @@ public class ActivityService extends Service implements SensorEventListener {
 	               scan_result = wifi.getScanResults();
 	               
 	               home_ssid = settings.getString("homeSSID", null);
+	               
+	               // A flag to disable Wifi after a scan result has come in.
+	               if(mDisableWifiAS) {
+	            	   wifi.setWifiEnabled(false);
+	            	   mDisableWifiAS=false;
+	               }
 	            	   
 	               if(home_ssid==null) // If it is still null, then the user still hasn't set it
 	            	   return;
@@ -143,24 +150,10 @@ public class ActivityService extends Service implements SensorEventListener {
 	            	   if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
 	               }
 	               
-	               user_is_home=homenet_in_list;
-	               //Log.d(getClass().getSimpleName(), "Got a scan result, user_is_home: " + Integer.toString(user_is_home));
+	               user_is_home=homenet_in_list;	               
             	}
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));   
-        
-        /*registerReceiver(new BroadcastReceiver()
-        {
-            @Override
-            public void onReceive(Context c, Intent intent) 
-            {
-            	if("android.intent.action.BOOT_COMPLETED".equals(intent.getAction())) {
-            		Toast.makeText(getApplicationContext(), "Got the boot complete...", Toast.LENGTH_LONG).show();	
-            	}
-            }
-        }, new IntentFilter("android.intent.action.BOOT_COMPLETED")); 
-        */   
-        
     }
     
     @Override
@@ -173,7 +166,7 @@ public class ActivityService extends Service implements SensorEventListener {
     public IBinder onBind(Intent intent) {
     	return null;
     }
-	
+    
 	@Override
 	public void onAccuracyChanged(Sensor sensor, int accuracy) {
 		// can be safely ignored for this demo

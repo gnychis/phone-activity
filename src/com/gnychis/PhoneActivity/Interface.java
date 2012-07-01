@@ -81,7 +81,8 @@ public class Interface extends Activity {
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         
         // If Wifi is disabled, we need to enable it just to retrieve this list and do a scan
-        if(!wifi.isWifiEnabled())
+        boolean wifi_disabled=!wifi.isWifiEnabled();
+        if(wifi_disabled)
         	wifi.setWifiEnabled(true);
         while(!wifi.isWifiEnabled()) {}
         
@@ -127,7 +128,7 @@ public class Interface extends Activity {
             }
         });
         
-        wifi.startScan();
+        wifi.setWifiEnabled(wifi_disabled);  // If the user had wifi disabled, re-disable it
     }
     
     // When the user clicks finished, we save some information locally, only some of this information
