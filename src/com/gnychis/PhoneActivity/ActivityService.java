@@ -114,7 +114,8 @@ public class ActivityService extends Service implements SensorEventListener {
             public void onReceive(Context c, Intent intent) 
             {
             	if(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(intent.getAction())) {
-	               scan_result = wifi.getScanResults();
+	               if((scan_result = wifi.getScanResults())==null)
+	            	   return;
 	               
 	               home_ssid = settings.getString("homeSSID", null);
 	               
@@ -153,7 +154,23 @@ public class ActivityService extends Service implements SensorEventListener {
 	               user_is_home=homenet_in_list;	               
             	}
             }
-        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));   
+        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));  
+        
+        // Do a single scan to start to get things moving
+        triggerScan(true);
+    }
+    
+    // This triggers a wifi scan.  If the wifi is disabled, it enables it for the duration of
+    // a single scan and then disables it again.  This likely only takes 200ms total from the time
+    // to enable, scan, and get a result, and then disable it again.  If the wifi is already enabled,
+    // then it simply triggers the scan.
+    public void triggerScan(boolean single_scan) {
+    	mDisableWifiAS=single_scan;
+        boolean wifi_enabled=wifi.isWifiEnabled();
+        if(!wifi_enabled)
+        	wifi.setWifiEnabled(true);
+        while(!wifi.isWifiEnabled()) {}
+        wifi.startScan();
     }
     
     @Override

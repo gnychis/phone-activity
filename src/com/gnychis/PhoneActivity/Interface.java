@@ -131,8 +131,8 @@ public class Interface extends Activity {
         wifi.setWifiEnabled(wifi_enabled);  // If the user had wifi disabled, re-disable it
     }
     
-    // When the user clicks finished, we save some information locally, only some of this information
-    // is anonymously shared with us!
+    // When the user clicks finished, we save some information locally.  The home network name is
+    // only saved locally (so that our application can work), and it is never shared back with us.
     public void clickedFinished(View v) {
     	home_ssid = (String) netlist.getSelectedItem();
     	int selected_age_id = (int) agelist.getSelectedItemId();
@@ -149,6 +149,9 @@ public class Interface extends Activity {
     	finish();
     }
     
+    // This sends us your optional "survey" like results.  It does so anonymously by accompanying them
+    // with a unique but random ID.  Note that your home network name or location are NOT transmitted
+    // back to us.  
     protected void sendUserData() {
         Thread t = new Thread(){
         public void run() {
@@ -178,12 +181,8 @@ public class Interface extends Activity {
                     if(response!=null) {
                         InputStream in = response.getEntity().getContent();
                         String a = convertStreamToString(in);
-                        sleep(1);
                     }
-                }
-                catch(Exception e){
-
-                }
+                } catch(Exception e){}
                 Looper.loop(); //Loop in the message queue
             }
         };
@@ -204,11 +203,10 @@ public class Interface extends Activity {
     	}
       };
     
+      // For converting an incoming input stream to a string
       private static String convertStreamToString(InputStream is) {
-
     	    BufferedReader reader = new BufferedReader(new InputStreamReader(is));
     	    StringBuilder sb = new StringBuilder();
-
     	    String line = null;
     	    try {
     	        while ((line = reader.readLine()) != null) {
