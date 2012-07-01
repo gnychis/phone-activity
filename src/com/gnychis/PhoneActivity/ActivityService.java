@@ -1,6 +1,8 @@
 package com.gnychis.PhoneActivity;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -20,6 +22,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 
 public class ActivityService extends Service implements SensorEventListener {
 	
@@ -38,6 +41,8 @@ public class ActivityService extends Service implements SensorEventListener {
     SharedPreferences.Editor sEditor;
     
     public boolean mDisableWifiAS;
+    public int mScansLeft;
+    public final int NUM_SCANS=3;
     
     // Used to keep the location of the home so that we know when the user is home.
     // However, we NEVER retrieve this information from the phone.  Your home location
@@ -55,25 +60,27 @@ public class ActivityService extends Service implements SensorEventListener {
     LocationManager locationManager;
     LocationListener locationListener;
     
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        return 1;
-    }
+    private static Timer mWifiCheck = new Timer(); 
     
     @Override
     public void onCreate() {
     	super.onCreate();
     	_this=this;
     	    	
-    	settings = getSharedPreferences(PREFS_NAME, 0);
-        sEditor = settings.edit();
+    	settings = getSharedPreferences(PREFS_NAME, 0);	// Open the application preference settings
+        sEditor = settings.edit();						// Get an editable reference
     	    	
-        mInitialized = false;
-    	mNextLocIsHome=false;
-    	mDisableWifiAS=false;
+        mInitialized = false;	// Related to initializing the sensors
+    	mNextLocIsHome=false;	// The next "location" update would be the user's home location
+    	mDisableWifiAS=false;	// Initialize "disable wifi after scan"
+    	mScansLeft=0;			// Do not initialize with any scans
+    	
+    	// Set up listeners to detect movement of the phone
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         
+        // If we have already determined the location of the user's home (NEVER shared with us, and only
+        // stored locally on your phone), then we read it from the application settings.
         if(!settings.getBoolean("haveHomeLoc", false)) {
         	mHaveHomeLoc=false;
         } else {
@@ -82,10 +89,14 @@ public class ActivityService extends Service implements SensorEventListener {
         	mLatCoord = settings.getFloat("latCoord",-1);
         }
         
+        // Setup a location manager to receive location updates.
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         
-        // Define a listener that responds to location updates
+        // Define a listener that receives location updates.  This is for us to know *when* to monitor
+        // the phone activity.  We only want to monitor it when your home.  When you're not home, our
+        // entire service is basically disabled.  This information is only stored locally on your phone
+        // and NEVER sent back to us.  For us to know how often your phone is "in your home" this is necessary.
         locationListener = new LocationListener() {
             public void onLocationChanged(Location location) {
             	if(mNextLocIsHome) {
@@ -94,13 +105,11 @@ public class ActivityService extends Service implements SensorEventListener {
             		sEditor.putFloat("longCoord", (float)location.getLongitude());
             		sEditor.putFloat("latCoord", (float)location.getLatitude());
             		sEditor.commit();
+            		Log.d("BLAH", "Got home location and saved it.");
             	}
             }
-
             public void onStatusChanged(String provider, int status, Bundle extras) {}
-
             public void onProviderEnabled(String provider) {}
-
             public void onProviderDisabled(String provider) {}
         };
           
@@ -114,13 +123,16 @@ public class ActivityService extends Service implements SensorEventListener {
             public void onReceive(Context c, Intent intent) 
             {
             	if(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(intent.getAction())) {
+            	   Log.d("BLAH", "Got incoming scan result...");
 	               if((scan_result = wifi.getScanResults())==null)
 	            	   return;
 	               
 	               home_ssid = settings.getString("homeSSID", null);
 	               
+	               if(mScansLeft-->0) wifi.startScan();
+	               
 	               // A flag to disable Wifi after a scan result has come in.
-	               if(mDisableWifiAS) {
+	               if(mDisableWifiAS && mScansLeft==0) {
 	            	   wifi.setWifiEnabled(false);
 	            	   mDisableWifiAS=false;
 	               }
@@ -133,6 +145,11 @@ public class ActivityService extends Service implements SensorEventListener {
 	            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
 	            		   homenet_in_list=1;
 	               
+	               Log.d("BLAH", "Home net (" + home_ssid + ") is in list (" + scan_result.size() + ") " + homenet_in_list + "  user is home:" + user_is_home);
+	               for(ScanResult result : scan_result)
+	            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
+	            		   Log.d("BLAH", "... " + result.SSID.replaceAll("^\"|\"$", ""));
+	               
 	               // The user is now home, we need to register the sensor listener
 	               if(user_is_home==0 && homenet_in_list==1) {
 	            	   mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
@@ -140,8 +157,10 @@ public class ActivityService extends Service implements SensorEventListener {
 	            	   // If we don't have the location of the home saved yet (which is NEVER sent back to us, it's
 	            	   // only kept locally on the user's phone), then we save it in the application preferences.
 	            	   if(!mHaveHomeLoc) {
+	            		   Log.d("BLAH", "Do not yet have home location, trying to lock on to it.  Should be canceling scan");
 	            		   mNextLocIsHome=true;
 	            		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, null);
+	            		   mWifiCheck.cancel();
 	            	   }
 	               }
 	               
@@ -155,21 +174,34 @@ public class ActivityService extends Service implements SensorEventListener {
             	}
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));  
-        
-        // Do a single scan to start to get things moving
-        triggerScan(true);
+
+        // Start the timer for the wifi check if needed
+        if(!mHaveHomeLoc)
+        	mWifiCheck.scheduleAtFixedRate(new WifiCheck(), 0, 30000);
     }
+    
+    // This runs when our Wifi check timer expires, this is once every 15 minutes and *only*
+    // used if we do not yet know the location of the home.
+    private class WifiCheck extends TimerTask
+    { 
+        public void run() 
+        {
+            triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
+            Log.d("BLAH", "Triggering a scan, home known: " + mHaveHomeLoc);
+        }
+    }   
     
     // This triggers a wifi scan.  If the wifi is disabled, it enables it for the duration of
     // a single scan and then disables it again.  This likely only takes 200ms total from the time
     // to enable, scan, and get a result, and then disable it again.  If the wifi is already enabled,
     // then it simply triggers the scan.
-    public void triggerScan(boolean single_scan) {
-    	mDisableWifiAS=single_scan;
+    public void triggerScan(boolean disable_after_scan) {
+    	mDisableWifiAS=disable_after_scan;
         boolean wifi_enabled=wifi.isWifiEnabled();
         if(!wifi_enabled)
         	wifi.setWifiEnabled(true);
         while(!wifi.isWifiEnabled()) {}
+        mScansLeft=NUM_SCANS-1;
         wifi.startScan();
     }
     
@@ -177,6 +209,7 @@ public class ActivityService extends Service implements SensorEventListener {
     public void onDestroy() {
     	super.onDestroy();
     	mSensorManager.unregisterListener(this);
+    	locationManager.removeUpdates(locationListener);
     }
     
     @Override
