@@ -79,6 +79,12 @@ public class Interface extends Activity {
         // Gets the list of networks on their phone and puts them in to a drop-down menu
         // for them to select their home network from.
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        
+        // If Wifi is disabled, we need to enable it just to retrieve this list and do a scan
+        if(!wifi.isWifiEnabled())
+        	wifi.setWifiEnabled(true);
+        while(!wifi.isWifiEnabled()) {}
+        
         List<WifiConfiguration> cfgNets = wifi.getConfiguredNetworks();
         netlist = (Spinner) findViewById(R.id.network_list);
         ArrayList<String> spinnerArray = new ArrayList<String>();

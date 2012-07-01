@@ -13,8 +13,12 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
@@ -33,11 +37,23 @@ public class ActivityService extends Service implements SensorEventListener {
     ActivityService _this;
     public static final String PREFS_NAME = "PhoneActivityPrefs";
     SharedPreferences settings;
+    SharedPreferences.Editor sEditor;
+    
+    // Used to keep the location of the home so that we know when the user is home.
+    // However, we NEVER retrieve this information from the phone.  Your home location
+    // is only kept privately on your phone.
+    boolean mNextLocIsHome;
+    boolean mHaveHomeLoc;
+    float mLongCoord=0;
+    float mLatCoord=0;
 
     WifiManager wifi;
     int user_is_home=0;
     List<ScanResult> scan_result;
     String home_ssid;
+    
+    LocationManager locationManager;
+    LocationListener locationListener;
     
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -48,15 +64,46 @@ public class ActivityService extends Service implements SensorEventListener {
     public void onCreate() {
     	super.onCreate();
     	_this=this;
-    	
+    	    	
     	settings = getSharedPreferences(PREFS_NAME, 0);
+        sEditor = settings.edit();
     	    	
         mInitialized = false;
+    	mNextLocIsHome=false;
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         
+        if(!settings.getBoolean("haveHomeLoc", false)) {
+        	mHaveHomeLoc=false;
+        } else {
+        	mHaveHomeLoc=true;
+        	mLongCoord = settings.getFloat("longCoord",-1);
+        	mLatCoord = settings.getFloat("latCoord",-1);
+        }
+        
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-       //mSensorManager.registerListener(this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        
+        // Define a listener that responds to location updates
+        locationListener = new LocationListener() {
+            public void onLocationChanged(Location location) {
+            	if(mNextLocIsHome) {
+            		mHaveHomeLoc=true;
+            		sEditor.putBoolean("haveHomeLoc", true);
+            		sEditor.putFloat("longCoord", (float)location.getLongitude());
+            		sEditor.putFloat("latCoord", (float)location.getLatitude());
+            		sEditor.commit();
+            	}
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            public void onProviderEnabled(String provider) {}
+
+            public void onProviderDisabled(String provider) {}
+        };
+          
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 15, 0, locationListener);
         
         // Create a broadcast receiver to listen for wifi scan results. We don't invoke them, we only passively
         // listen whenever they become available.
@@ -79,8 +126,16 @@ public class ActivityService extends Service implements SensorEventListener {
 	            		   homenet_in_list=1;
 	               
 	               // The user is now home, we need to register the sensor listener
-	               if(user_is_home==0 && homenet_in_list==1)
+	               if(user_is_home==0 && homenet_in_list==1) {
 	            	   mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+	            	   
+	            	   // If we don't have the location of the home saved yet (which is NEVER sent back to us, it's
+	            	   // only kept locally on the user's phone), then we save it in the application preferences.
+	            	   if(!mHaveHomeLoc) {
+	            		   mNextLocIsHome=true;
+	            		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, null);
+	            	   }
+	               }
 	               
 	               // The user has left home, we need to unregister it
 	               if(user_is_home==1 && homenet_in_list==0) {
@@ -94,7 +149,7 @@ public class ActivityService extends Service implements SensorEventListener {
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));   
         
-        registerReceiver(new BroadcastReceiver()
+        /*registerReceiver(new BroadcastReceiver()
         {
             @Override
             public void onReceive(Context c, Intent intent) 
@@ -103,7 +158,8 @@ public class ActivityService extends Service implements SensorEventListener {
             		Toast.makeText(getApplicationContext(), "Got the boot complete...", Toast.LENGTH_LONG).show();	
             	}
             }
-        }, new IntentFilter("android.intent.action.BOOT_COMPLETED"));    
+        }, new IntentFilter("android.intent.action.BOOT_COMPLETED")); 
+        */   
         
     }
     
