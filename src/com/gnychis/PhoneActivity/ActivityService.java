@@ -119,7 +119,7 @@ public class ActivityService extends Service implements SensorEventListener {
             public void onProviderDisabled(String provider) {}
         };
           
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 15, 0, locationListener);
         
         // Create a broadcast receiver to listen for wifi scan results. We don't invoke them, we only passively
         // listen whenever they become available.
