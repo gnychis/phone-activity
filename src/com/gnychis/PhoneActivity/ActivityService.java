@@ -24,7 +24,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 
-public class ActivityService extends Service implements SensorEventListener {
+public class ActivityService extends Service implements SensorEventListener,LocationListener {
 	
     public static Interface mMainActivity;
     private final boolean DEBUG=true;
@@ -42,7 +42,7 @@ public class ActivityService extends Service implements SensorEventListener {
     
     public boolean mDisableWifiAS;
     public int mScansLeft;
-    public final int NUM_SCANS=3;
+    public final int NUM_SCANS=4;
     
     // Used to keep the location of the home so that we know when the user is home.
     // However, we NEVER retrieve this information from the phone.  Your home location
@@ -59,7 +59,9 @@ public class ActivityService extends Service implements SensorEventListener {
     LocationManager locationManager;
     LocationListener locationListener;
     
-    private static Timer mWifiCheck = new Timer(); 
+    public final int LOCATION_TIMER_RATE=120000;	// in milliseconds (15 minutes)
+    
+    private static Timer mLocationTimer = new Timer(); 
     
     @Override
     public void onCreate() {
@@ -93,35 +95,6 @@ public class ActivityService extends Service implements SensorEventListener {
         // Setup a location manager to receive location updates.
         wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-        
-        // Define a listener that receives location updates.  This is for us to know *when* to monitor
-        // the phone activity.  We only want to monitor it when your home.  When you're not home, our
-        // entire service is basically disabled.  This information is only stored locally on your phone
-        // and NEVER sent back to us.  For us to know how often your phone is "in your home" this is necessary.
-        locationListener = new LocationListener() {
-            public void onLocationChanged(Location location) {
-            	if(mNextLocIsHome) {
-            		mHaveHomeLoc=true;
-            		sEditor.putBoolean("haveHomeLoc", true);
-            		sEditor.putFloat("longCoord", (float)location.getLongitude());
-            		sEditor.putFloat("latCoord", (float)location.getLatitude());
-            		mHomeLoc=location;
-            		sEditor.commit();
-            	}
-            	
-            	if(mHaveHomeLoc) {
-            		if(mHomeLoc.distanceTo(location)<=20)
-            			home();
-            		else
-            			notHome();
-            	}
-            }
-            public void onStatusChanged(String provider, int status, Bundle extras) {}
-            public void onProviderEnabled(String provider) {}
-            public void onProviderDisabled(String provider) {}
-        };
-          
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 15, 0, locationListener);
         
         // Create a broadcast receiver to listen for wifi scan results. We don't invoke them, we only passively
         // listen whenever they become available.
@@ -162,19 +135,14 @@ public class ActivityService extends Service implements SensorEventListener {
 	            	   // only kept locally on the user's phone), then we save it in the application preferences.
 	            	   if(!mHaveHomeLoc) {
 	            		   mNextLocIsHome=true;
-	            		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, null);
-	            		   mWifiCheck.cancel();
+	            		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, _this, null);
 	            	   }
-	               } else {
-	            	   notHome();
-	               }	               
+	               }               
             	}
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));  
 
-        // Start the timer for the wifi check if needed
-        if(!mHaveHomeLoc)
-        	mWifiCheck.scheduleAtFixedRate(new WifiCheck(), 0, 900000);
+        mLocationTimer.scheduleAtFixedRate(new LocationCheck(), 0, LOCATION_TIMER_RATE);
     }
     
     private void home() {
@@ -192,11 +160,17 @@ public class ActivityService extends Service implements SensorEventListener {
     
     // This runs when our Wifi check timer expires, this is once every 15 minutes and *only*
     // used if we do not yet know the location of the home.
-    private class WifiCheck extends TimerTask
+    private class LocationCheck extends TimerTask
     { 
         public void run() 
         {
-            triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
+        	if(!mHaveHomeLoc) {
+        		Log.d("BLAH", "Triggering wifi scan");
+        		triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
+        	} else {
+        		Log.d("BLAH", "Triggering location check");
+        		locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, _this, null);
+        	}
         }
     }   
     
@@ -234,6 +208,31 @@ public class ActivityService extends Service implements SensorEventListener {
 	public static void setMainActivity(Interface activity) {
 		mMainActivity = activity;
 	}
+	
+    public void onLocationChanged(Location location) {
+    	if(mNextLocIsHome) {
+    		mHaveHomeLoc=true;
+    		sEditor.putBoolean("haveHomeLoc", true);
+    		sEditor.putFloat("longCoord", (float)location.getLongitude());
+    		sEditor.putFloat("latCoord", (float)location.getLatitude());
+    		mHomeLoc=location;
+    		sEditor.commit();
+    		Log.d("BLAH", "Recorded home location as: (" + location.getLatitude() + "," + location.getLongitude() + ")");
+    	}
+    	
+    	if(mHaveHomeLoc) {
+    		Log.d("BLAH", "Home Location: (" + mHomeLoc.getLatitude() + "," + mHomeLoc.getLongitude() + ")");
+    		Log.d("BLAH", "Current Location: (" + location.getLatitude() + "," + location.getLongitude() + ")");
+        	Log.d("BLAH", "Distance is: " + mHomeLoc.distanceTo(location));
+    		if(mHomeLoc.distanceTo(location)<=20)
+    			home();
+    		else
+    			notHome();
+    	}
+    }
+    public void onStatusChanged(String provider, int status, Bundle extras) {}
+    public void onProviderEnabled(String provider) {}
+    public void onProviderDisabled(String provider) {}
 
 	@Override
 	public void onSensorChanged(SensorEvent event) {
