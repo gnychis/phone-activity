@@ -160,7 +160,7 @@ public class Interface extends Activity {
                 HttpResponse response;
                 JSONObject json = new JSONObject();
                 try{
-                    HttpPost post = new HttpPost("http://g.nychis.com/userdata.php");
+                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
                     
                     // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
                     // Note that your home network name is never sent to us.
