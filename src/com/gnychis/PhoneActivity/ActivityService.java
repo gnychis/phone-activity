@@ -22,6 +22,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 
 public class ActivityService extends Service implements SensorEventListener {
 	
@@ -80,11 +81,11 @@ public class ActivityService extends Service implements SensorEventListener {
         
         // If we have already determined the location of the user's home (NEVER shared with us, and only
         // stored locally on your phone), then we read it from the application settings.
+        mHomeLoc = new Location("Home");
         if(!settings.getBoolean("haveHomeLoc", false)) {
         	mHaveHomeLoc=false;
         } else {
         	mHaveHomeLoc=true;
-        	mHomeLoc = new Location("Home");
         	mHomeLoc.setLongitude(settings.getFloat("longCoord",-1));
         	mHomeLoc.setLatitude(settings.getFloat("latCoord",-1));
         }
@@ -104,6 +105,7 @@ public class ActivityService extends Service implements SensorEventListener {
             		sEditor.putBoolean("haveHomeLoc", true);
             		sEditor.putFloat("longCoord", (float)location.getLongitude());
             		sEditor.putFloat("latCoord", (float)location.getLatitude());
+            		mHomeLoc=location;
             		sEditor.commit();
             	}
             	
@@ -176,11 +178,13 @@ public class ActivityService extends Service implements SensorEventListener {
     }
     
     private void home() {
+    	Log.d("BLAH", "User is home");
     	if(!mUserIsHome) mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
     	mUserIsHome=true;
     }
     
     private void notHome() {
+    	Log.d("BLAH", "User is not home");
     	if(mUserIsHome) mSensorManager.unregisterListener(_this);
     	if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
     	mUserIsHome=false;
