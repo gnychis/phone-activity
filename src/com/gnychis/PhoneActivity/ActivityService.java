@@ -146,13 +146,11 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     }
     
     private void home() {
-    	Log.d("BLAH", "User is home");
     	if(!mUserIsHome) mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
     	mUserIsHome=true;
     }
     
     private void notHome() {
-    	Log.d("BLAH", "User is not home");
     	if(mUserIsHome) mSensorManager.unregisterListener(_this);
     	if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
     	mUserIsHome=false;
@@ -187,28 +185,11 @@ public class ActivityService extends Service implements SensorEventListener,Loca
         mScansLeft=NUM_SCANS;
         wifi.startScan();
     }
-    
-    @Override
-    public void onDestroy() {
-    	super.onDestroy();
-    	mSensorManager.unregisterListener(this);
-    	locationManager.removeUpdates(locationListener);
-    }
-    
-    @Override
-    public IBinder onBind(Intent intent) {
-    	return null;
-    }
-    
-	@Override
-	public void onAccuracyChanged(Sensor sensor, int accuracy) {
-		// can be safely ignored for this demo
-	}
 	
-	public static void setMainActivity(Interface activity) {
-		mMainActivity = activity;
-	}
-	
+	// We have an incoming location update.  If we have not yet saved the user's home location (WHICH
+	// IS NEVER SHARED WITH US - it is only stored locally on your phone), then we save it.  Otherwise
+	// we check the distance of the current location with the home location to detect if the user's
+	// phone is in their home.
     public void onLocationChanged(Location location) {
     	if(mNextLocIsHome) {
     		mHaveHomeLoc=true;
@@ -216,6 +197,7 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     		sEditor.putFloat("longCoord", (float)location.getLongitude());
     		sEditor.putFloat("latCoord", (float)location.getLatitude());
     		mHomeLoc=location;
+    		mNextLocIsHome=false;
     		sEditor.commit();
     		Log.d("BLAH", "Recorded home location as: (" + location.getLatitude() + "," + location.getLongitude() + ")");
     	}
@@ -229,11 +211,11 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     		else
     			notHome();
     	}
-    }
-    public void onStatusChanged(String provider, int status, Bundle extras) {}
-    public void onProviderEnabled(String provider) {}
-    public void onProviderDisabled(String provider) {}
+    }    
 
+    // We have an update on the sensor data.  We check that the movement of the phone
+    // exceeds a threshold, and if so we consider the phone as actively moving, otherwise
+    // we consider it to be stable (not moving).
 	@Override
 	public void onSensorChanged(SensorEvent event) {
 		float x = event.values[0];
@@ -264,4 +246,20 @@ public class ActivityService extends Service implements SensorEventListener,Loca
 			}
 		}
 	}
+
+    @Override
+    public void onDestroy() {
+    	super.onDestroy();
+    	mSensorManager.unregisterListener(this);
+    	locationManager.removeUpdates(locationListener);
+    }
+    
+    @Override
+    public IBinder onBind(Intent intent) { return null; }
+	@Override
+	public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+	public static void setMainActivity(Interface activity) { mMainActivity = activity; }
+    public void onStatusChanged(String provider, int status, Bundle extras) {}
+    public void onProviderEnabled(String provider) {}
+    public void onProviderDisabled(String provider) {}
 }
