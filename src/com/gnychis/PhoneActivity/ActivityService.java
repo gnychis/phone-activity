@@ -1,8 +1,14 @@
 package com.gnychis.PhoneActivity;
 
+import java.io.FileOutputStream;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import org.json.JSONObject;
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -22,12 +28,22 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 public class ActivityService extends Service implements SensorEventListener,LocationListener {
 	
     public static Interface mMainActivity;
+    static ActivityService _this;
+    PowerManager mPowerManager;
+
+    public final int LOCATION_TOLERANCE=100;		// in meters
+    public final int LOCATION_TIMER_RATE=900000;	// in milliseconds (15 minutes)
     private final boolean DEBUG=true;
+    
+    private final String DATA_FILENAME="pa_data.json";
+    private FileOutputStream data_ostream;
 
 	private float mLastX, mLastY, mLastZ;
 	private boolean mInitialized;
@@ -35,8 +51,6 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     private Sensor mAccelerometer;
     private final float NOISE = (float) 0.25;
     
-    static ActivityService _this;
-    public static final String PREFS_NAME = "PhoneActivityPrefs";
     SharedPreferences settings;
     SharedPreferences.Editor sEditor;
     
@@ -52,30 +66,30 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     Location mHomeLoc;
 
     WifiManager wifi;
-    boolean mUserIsHome;
+    boolean mPhoneIsInTheHome;
     List<ScanResult> scan_result;
     String home_ssid;
     
     LocationManager locationManager;
     LocationListener locationListener;
     
-    public final int LOCATION_TIMER_RATE=120000;	// in milliseconds (15 minutes)
-    
     private static Timer mLocationTimer = new Timer(); 
+    
+    Map<String,Object> mLastState;
     
     @Override
     public void onCreate() {
     	super.onCreate();
     	_this=this;
-    	    	    	
-    	settings = getSharedPreferences(PREFS_NAME, 0);	// Open the application preference settings
-        sEditor = settings.edit();						// Get an editable reference
+    	    	    	    	
+    	settings = getSharedPreferences(Interface.PREFS_NAME, 0);	// Open the application preference settings
+        sEditor = settings.edit();	// Get an editable reference
     	    	
         mInitialized = false;	// Related to initializing the sensors
     	mNextLocIsHome=false;	// The next "location" update would be the user's home location
     	mDisableWifiAS=false;	// Initialize "disable wifi after scan"
     	mScansLeft=0;			// Do not initialize with any scans
-    	mUserIsHome=false;		// To detect when the user is home
+    	mPhoneIsInTheHome=false;		// To detect when the user is home
     	
     	// Set up listeners to detect movement of the phone
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -121,39 +135,47 @@ public class ActivityService extends Service implements SensorEventListener,Loca
 	               if(home_ssid==null) // If it is still null, then the user still hasn't set it
 	            	   return;
 	               
-	               boolean homenet_in_list=false;
 	               for(ScanResult result : scan_result)
 	            	   if(result.SSID.replaceAll("^\"|\"$", "").equals(home_ssid))
-	            		   homenet_in_list=true;
-	               
-	               // If the user was not marked as being home, but their home network is in our list,
-	               // then we can mark them as home and save their location if needed.
-	               if(homenet_in_list) {
-	            	   home();
-	            	   
-	            	   // If we don't have the location of the home saved yet (which is NEVER sent back to us, it's
-	            	   // only kept locally on the user's phone), then we save it in the application preferences.
-	            	   if(!mHaveHomeLoc) {
-	            		   mNextLocIsHome=true;
-	            		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, _this, null);
-	            	   }
-	               }               
+	            		   home();	// Their home network is in the list, so they must be home        
             	}
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));  
 
         mLocationTimer.scheduleAtFixedRate(new LocationCheck(), 0, LOCATION_TIMER_RATE);
+        mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        
+        try {
+        	data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE | Context.MODE_APPEND);
+    		JSONObject jstate = new JSONObject();
+    		jstate.put("type","state");
+    		jstate.put("state","on");
+			data_ostream.write(jstate.toString().getBytes());
+			data_ostream.write("\n".getBytes()); 
+        } catch (Exception e) { }
     }
     
+    // The user's phone is in the home, either based on localization information or the fact that their
+    // Wifi access point is within range. If we don't have the location of the home saved yet 
+    // (which is NEVER sent back to us, it's only kept locally on the user's phone), 
+    // then we save it in the application preferences.
     private void home() {
-    	if(!mUserIsHome) mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
-    	mUserIsHome=true;
+    	Log.d("BLAH", "Marked as being home");
+    	if(!mPhoneIsInTheHome) mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+    	mPhoneIsInTheHome=true;
+    	
+    	if(!mHaveHomeLoc) {
+ 		   mNextLocIsHome=true;
+ 		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, _this, null);
+    	}
     }
     
+    // The user's phone is not in the home based on localization information.
     private void notHome() {
-    	if(mUserIsHome) mSensorManager.unregisterListener(_this);
+    	Log.d("BLAH", "Marked as no longer being home");
+    	if(mPhoneIsInTheHome) mSensorManager.unregisterListener(_this);
     	if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
-    	mUserIsHome=false;
+    	mPhoneIsInTheHome=false;
     }
     
     // This runs when our Wifi check timer expires, this is once every 15 minutes and *only*
@@ -191,6 +213,7 @@ public class ActivityService extends Service implements SensorEventListener,Loca
 	// we check the distance of the current location with the home location to detect if the user's
 	// phone is in their home.
     public void onLocationChanged(Location location) {
+    	Log.d("BLAH", "Location accuracy is: " + location.getAccuracy());
     	if(mNextLocIsHome) {
     		mHaveHomeLoc=true;
     		sEditor.putBoolean("haveHomeLoc", true);
@@ -206,7 +229,7 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     		Log.d("BLAH", "Home Location: (" + mHomeLoc.getLatitude() + "," + mHomeLoc.getLongitude() + ")");
     		Log.d("BLAH", "Current Location: (" + location.getLatitude() + "," + location.getLongitude() + ")");
         	Log.d("BLAH", "Distance is: " + mHomeLoc.distanceTo(location));
-    		if(mHomeLoc.distanceTo(location)<=20)
+    		if(mHomeLoc.distanceTo(location)<=LOCATION_TOLERANCE)
     			home();
     		else
     			notHome();
@@ -218,6 +241,7 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     // we consider it to be stable (not moving).
 	@Override
 	public void onSensorChanged(SensorEvent event) {
+		boolean movement=false;
 		float x = event.values[0];
 		float y = event.values[1];
 		float z = event.values[2];
@@ -239,17 +263,47 @@ public class ActivityService extends Service implements SensorEventListener,Loca
 			
 			if (deltaX > deltaY) {  // We moved horizontally
 				if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.RED);
+				movement=true;
 			} else if (deltaY > deltaX) {  // We moved vertically
 				if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.RED);
+				movement=true;
 			} else {
 				if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
+				movement=false;
 			}
+			
+			// Store data about the phone's state
+			try {
+				Map<String,Object> state = new HashMap<String, Object>();
+				state.put("type", "activity");
+				state.put("clientID", settings.getInt("randClientID",-1));
+				state.put("movement", movement);
+				state.put("wifiOn", wifi.isWifiEnabled());
+				state.put("screen", mPowerManager.isScreenOn());
+				if(mLastState==null || !state.equals(mLastState)) {
+					mLastState = new HashMap<String,Object>(state);
+					state.put("time", new Date());
+					state.put("millis", System.currentTimeMillis());
+					state.put("wifiStrength", wifi.getConnectionInfo().getRssi());
+					data_ostream.write(new JSONObject(state).toString().getBytes());
+					data_ostream.write("\n".getBytes());
+				}
+			} catch(Exception e) {}
+			
 		}
 	}
 
     @Override
     public void onDestroy() {
     	super.onDestroy();
+    	try {
+    		JSONObject jstate = new JSONObject();
+    		jstate.put("type","state");
+    		jstate.put("state","off");
+			data_ostream.write(jstate.toString().getBytes());
+			data_ostream.write("\n".getBytes());   		
+    		data_ostream.close();
+    	} catch(Exception e) {}
     	mSensorManager.unregisterListener(this);
     	locationManager.removeUpdates(locationListener);
     }
