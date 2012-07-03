@@ -136,6 +136,12 @@ public class Interface extends Activity {
     public void clickedFinished(View v) {
     	home_ssid = (String) netlist.getSelectedItem();
     	int selected_age_id = (int) agelist.getSelectedItemId();
+    	if(home_ssid!=settings.getString("homeSSID", null)) {  // if the user changed their SSID, we need to reset some things
+    		sEditor.putBoolean("haveHomeLoc", false);
+    		sEditor.remove("longCoord");
+    		sEditor.remove("latCoord");
+    		sEditor.remove("lastUpdate");
+    	}
     	sEditor.putString("homeSSID", home_ssid);
     	sEditor.putInt("ageRange", selected_age_id);
     	sEditor.putInt("kitchen", (((CheckBox) findViewById(R.id.kitchen)).isChecked()==true) ? 1 : 0);
@@ -194,9 +200,9 @@ public class Interface extends Activity {
     // more likely to be at the top of the list.
     Comparator<Object> netsort = new Comparator<Object>() {
     	public int compare(Object arg0, Object arg1) {
-    		if(((WifiConfiguration)arg0).priority < ((WifiConfiguration)arg1).priority)
+    		if(((WifiConfiguration)arg0).priority > ((WifiConfiguration)arg1).priority)
     			return 1;
-    		else if( ((WifiConfiguration)arg0).priority > ((WifiConfiguration)arg1).priority)
+    		else if( ((WifiConfiguration)arg0).priority < ((WifiConfiguration)arg1).priority)
     			return -1;
     		else
     			return 0;

@@ -223,7 +223,9 @@ public class ActivityService extends Service implements SensorEventListener {
     { 
         public void run() 
         {
+        	mHaveHomeLoc=settings.getBoolean("haveHomeLoc", false);
         	if(!mHaveHomeLoc) {
+        		mPhoneIsInTheHome=false;	// Phone can't be in the home if we don't have the location
         		Log.d("BLAH", "Triggering wifi scan");
         		triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
         	} else {
