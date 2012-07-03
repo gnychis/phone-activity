@@ -45,8 +45,6 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
-import android.util.Log;
-import android.widget.CheckBox;
 
 public class ActivityService extends Service implements SensorEventListener {
 	
@@ -57,9 +55,9 @@ public class ActivityService extends Service implements SensorEventListener {
     PendingIntent mPendingIntent;
     Intent mIntent;
 
-    public final int LOCATION_TOLERANCE=100;		// in meters
-    public final int LOCATION_TIMER_RATE=900000;	// in milliseconds (15 minutes)
-    public final int SEND_UPDATE_DELAY=21600;		// in seconds (6 hours)
+    public final int LOCATION_TOLERANCE=100;			// in meters
+    public final int LOCATION_UPDATE_INTERVAL=900000;	// in milliseconds (15 minutes)
+    public final int SEND_UPDATE_DELAY=21600;			// in seconds (6 hours)
     private final boolean DEBUG=false;
     
     private final String DATA_FILENAME="pa_data.json";
@@ -182,8 +180,9 @@ public class ActivityService extends Service implements SensorEventListener {
             }
            },new IntentFilter("LOC_OBTAINED"));
 
-        mLocationTimer.scheduleAtFixedRate(new LocationCheck(), 0, LOCATION_TIMER_RATE);
+        mLocationTimer.scheduleAtFixedRate(new PeriodicUpdate(), 0, LOCATION_UPDATE_INTERVAL);
         mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        changeUpdateInterval(LOCATION_UPDATE_INTERVAL);
         
         try {
         	data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE | Context.MODE_APPEND);
@@ -202,6 +201,11 @@ public class ActivityService extends Service implements SensorEventListener {
         } catch (Exception e) { }
     }
     
+    private void changeUpdateInterval(long interval) {
+    	locationManager.removeUpdates(mPendingIntent);
+    	locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, interval, 0, mPendingIntent);
+    }
+    
     // The user's phone is in the home, either based on localization information or the fact that their
     // Wifi access point is within range. If we don't have the location of the home saved yet 
     // (which is NEVER sent back to us, it's only kept locally on the user's phone), 
@@ -212,7 +216,7 @@ public class ActivityService extends Service implements SensorEventListener {
     	
     	if(!mHaveHomeLoc) {
  		   mNextLocIsHome=true;
- 		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, mPendingIntent);
+ 		   changeUpdateInterval(60000);
     	}
     }
     
@@ -225,7 +229,7 @@ public class ActivityService extends Service implements SensorEventListener {
     
     // This runs when our Wifi check timer expires, this is once every 15 minutes and *only*
     // used if we do not yet know the location of the home.
-    private class LocationCheck extends TimerTask
+    private class PeriodicUpdate extends TimerTask
     { 
         public void run() 
         {
@@ -233,9 +237,7 @@ public class ActivityService extends Service implements SensorEventListener {
         	if(!mHaveHomeLoc) {
         		mPhoneIsInTheHome=false;	// Phone can't be in the home if we don't have the location
         		triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
-        	} else {
-        		locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, mPendingIntent);
-				
+        	} else {				
 				// If it's been 6 hours since the last update, sending anonymous information, let's do it.
 				String lu = settings.getString("lastUpdate", null);
 				if(lu!=null) {
@@ -281,6 +283,7 @@ public class ActivityService extends Service implements SensorEventListener {
     		mNextLocIsHome=false;
     		sEditor.putString("lastUpdate", (new Date()).toString());
     		sEditor.commit();
+    		changeUpdateInterval(LOCATION_UPDATE_INTERVAL);  // Once we get the location, we slow down updates.
     	}
     	
     	if(mHaveHomeLoc) {
