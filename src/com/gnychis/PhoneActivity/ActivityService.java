@@ -1,13 +1,26 @@
 package com.gnychis.PhoneActivity;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONObject;
 
 import android.app.PendingIntent;
@@ -30,6 +43,7 @@ import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -247,6 +261,7 @@ public class ActivityService extends Service implements SensorEventListener {
     		sEditor.putFloat("latCoord", (float)location.getLatitude());
     		mHomeLoc=location;
     		mNextLocIsHome=false;
+    		sEditor.putString("lastUpdate", (new Date()).toString());
     		sEditor.commit();
     		Log.d("BLAH", "Recorded home location as: (" + location.getLatitude() + "," + location.getLongitude() + ")");
     	}
@@ -300,6 +315,7 @@ public class ActivityService extends Service implements SensorEventListener {
 			
 			// Store data about the phone's state
 			try {
+				// Store the current state
 				final Intent batteryIntent = getApplicationContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 				boolean isCharging = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING;
 				Map<String,Object> state = new HashMap<String, Object>();
@@ -317,9 +333,58 @@ public class ActivityService extends Service implements SensorEventListener {
 					data_ostream.write(new JSONObject(state).toString().getBytes());
 					data_ostream.write("\n".getBytes());
 				}
-			} catch(Exception e) {}
-			
+				
+				// If it's been 6 hours since the last update, do it now
+				Date lastUpdate = new Date(settings.getString("lastUpdate", null));
+				Date currTime = new Date();
+				long timeDiff = TimeUnit.MILLISECONDS.toSeconds(currTime.getTime() - lastUpdate.getTime());
+				if(timeDiff>120) {
+					sEditor.putString("lastUpdate", (new Date()).toString());
+					sEditor.commit();
+					sendUpdate();
+				}
+				
+			} catch(Exception e) {}	
 		}
+	}
+	
+	public void sendUpdate() {
+        Thread t = new Thread(){
+        public void run() {
+                Looper.prepare(); // For Preparing Message Pool for the child Thread
+                HttpClient client = new DefaultHttpClient();
+                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
+                HttpResponse response;
+                JSONObject json = new JSONObject();
+                try{
+                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
+                    
+                    // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
+                    // Note that your home network name is never sent to us.
+                    json.put("clientID", settings.getInt("randClientID",-1));
+                    FileInputStream finput = openFileInput(DATA_FILENAME);
+                    InputStreamReader inputStreamReader = new InputStreamReader(finput);
+                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = bufferedReader.readLine()) != null) {
+                        sb.append(line);
+                    } 
+                   json.put("data", sb.toString());
+                    
+                    StringEntity se = new StringEntity( json.toString());  
+                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
+                    post.setEntity(se);
+                    response = client.execute(post);
+                    if(response!=null) {
+                        InputStream in = response.getEntity().getContent();
+                        String a = Interface.convertStreamToString(in);
+                    }
+                } catch(Exception e){}
+                Looper.loop(); //Loop in the message queue
+            }
+        };
+        t.start();  
 	}
 
     @Override

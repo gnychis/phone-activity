@@ -161,7 +161,7 @@ public class Interface extends Activity {
                 HttpResponse response;
                 JSONObject json = new JSONObject();
                 try{
-                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
+                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/survey.php");
                     
                     // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
                     // Note that your home network name is never sent to us.
@@ -204,7 +204,7 @@ public class Interface extends Activity {
       };
     
       // For converting an incoming input stream to a string
-      private static String convertStreamToString(InputStream is) {
+      public static String convertStreamToString(InputStream is) {
     	    BufferedReader reader = new BufferedReader(new InputStreamReader(is));
     	    StringBuilder sb = new StringBuilder();
     	    String line = null;
