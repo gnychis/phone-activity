@@ -27,9 +27,9 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
+import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -146,14 +146,25 @@ public class ActivityService extends Service implements SensorEventListener {
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)); 
         
+        registerReceiver(new BroadcastReceiver()
+        {
+        	@Override
+        	public void onReceive(Context context, Intent intent)
+        	{
+        		cleanup();
+        	}
+        }, new IntentFilter(Intent.ACTION_SHUTDOWN));
+        
         mIntent=new Intent("LOC_OBTAINED");
         mPendingIntent=PendingIntent.getBroadcast(this,0,mIntent,0);
         registerReceiver(new BroadcastReceiver(){
             public void onReceive(Context arg0, Intent arg1)
             {
-            	Bundle bundle=arg1.getExtras();
-                Location location=(Location)bundle.get(LocationManager.KEY_LOCATION_CHANGED);
-              	onLocationChanged(location);
+            	if(arg1.getAction().equals(LocationManager.KEY_LOCATION_CHANGED)) {
+	            	Bundle bundle=arg1.getExtras();
+	                Location location=(Location)bundle.get(LocationManager.KEY_LOCATION_CHANGED);
+	              	onLocationChanged(location);
+            	}
             }
            },new IntentFilter("LOC_OBTAINED"));
 
@@ -289,12 +300,15 @@ public class ActivityService extends Service implements SensorEventListener {
 			
 			// Store data about the phone's state
 			try {
+				final Intent batteryIntent = getApplicationContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+				boolean isCharging = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING;
 				Map<String,Object> state = new HashMap<String, Object>();
 				state.put("type", "activity");
 				state.put("clientID", settings.getInt("randClientID",-1));
 				state.put("movement", movement);
 				state.put("wifiOn", wifi.isWifiEnabled());
 				state.put("screen", mPowerManager.isScreenOn());
+				state.put("charging", isCharging);
 				if(mLastState==null || !state.equals(mLastState)) {
 					mLastState = new HashMap<String,Object>(state);
 					state.put("time", new Date());
@@ -311,6 +325,10 @@ public class ActivityService extends Service implements SensorEventListener {
     @Override
     public void onDestroy() {
     	super.onDestroy();
+    	cleanup();
+    }
+    
+    private void cleanup() {
     	try {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
@@ -320,7 +338,6 @@ public class ActivityService extends Service implements SensorEventListener {
     		data_ostream.close();
     	} catch(Exception e) {}
     	mSensorManager.unregisterListener(this);
-    	locationManager.removeUpdates(locationListener);
     }
     
     @Override
