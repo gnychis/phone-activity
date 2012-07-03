@@ -335,16 +335,21 @@ public class ActivityService extends Service implements SensorEventListener {
 				}
 				
 				// If it's been 6 hours since the last update, do it now
-				Date lastUpdate = new Date(settings.getString("lastUpdate", null));
-				Date currTime = new Date();
-				long timeDiff = TimeUnit.MILLISECONDS.toSeconds(currTime.getTime() - lastUpdate.getTime());
-				if(timeDiff>120) {
-					sEditor.putString("lastUpdate", (new Date()).toString());
-					sEditor.commit();
-					sendUpdate();
+				String lu = settings.getString("lastUpdate", null);
+				if(lu!=null) {
+					@SuppressWarnings("deprecation")
+					Date lastUpdate = new Date(lu);
+					Date currTime = new Date();
+					long timeDiff = TimeUnit.MILLISECONDS.toSeconds(currTime.getTime() - lastUpdate.getTime());
+					if(timeDiff>120) {
+						sEditor.putString("lastUpdate", (new Date()).toString());
+						sEditor.commit();
+						sendUpdate();
+					}
 				}
-				
-			} catch(Exception e) {}	
+			} catch(Exception e) {
+				Log.e("BLAH", "Exception on time: " + e.toString());
+			}	
 		}
 	}
 	
