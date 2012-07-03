@@ -104,10 +104,10 @@ public class ActivityService extends Service implements SensorEventListener {
     	settings = getSharedPreferences(Interface.PREFS_NAME, 0);	// Open the application preference settings
         sEditor = settings.edit();	// Get an editable reference
     	    	
-        mInitialized = false;	// Related to initializing the sensors
-    	mNextLocIsHome=false;	// The next "location" update would be the user's home location
-    	mDisableWifiAS=false;	// Initialize "disable wifi after scan"
-    	mScansLeft=0;			// Do not initialize with any scans
+        mInitialized = false;			// Related to initializing the sensors
+    	mNextLocIsHome=false;			// The next "location" update would be the user's home location
+    	mDisableWifiAS=false;			// Initialize "disable wifi after scan"
+    	mScansLeft=0;					// Do not initialize with any scans
     	mPhoneIsInTheHome=false;		// To detect when the user is home
     	
     	// Set up listeners to detect movement of the phone
@@ -384,11 +384,15 @@ public class ActivityService extends Service implements SensorEventListener {
                     if(response!=null) {
                         InputStream in = response.getEntity().getContent();
                         String a = Interface.convertStreamToString(in);
-                        // Now we can overwrite the local file so it doesn't grow too large.
-                        data_ostream.close();
-                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
+                        if(a.replace("\n", "").equals("OK")) {
+	                        // Now we can overwrite the local file so it doesn't grow too large.
+	                        data_ostream.close();
+	                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
+                        }
                     }
-                } catch(Exception e){}
+                } catch(Exception e){
+                	Log.e("BLAH", "Exception handling HTTP data: " + e);
+                }
                 Looper.loop(); //Loop in the message queue
             }
         };
