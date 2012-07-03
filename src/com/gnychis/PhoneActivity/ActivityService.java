@@ -10,6 +10,7 @@ import java.util.TimerTask;
 
 import org.json.JSONObject;
 
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -32,11 +33,14 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
-public class ActivityService extends Service implements SensorEventListener,LocationListener {
+public class ActivityService extends Service implements SensorEventListener {
 	
     public static Interface mMainActivity;
     static ActivityService _this;
     PowerManager mPowerManager;
+    
+    PendingIntent mPendingIntent;
+    Intent mIntent;
 
     public final int LOCATION_TOLERANCE=100;		// in meters
     public final int LOCATION_TIMER_RATE=900000;	// in milliseconds (15 minutes)
@@ -140,7 +144,18 @@ public class ActivityService extends Service implements SensorEventListener,Loca
 	            		   home();	// Their home network is in the list, so they must be home        
             	}
             }
-        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));  
+        }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)); 
+        
+        mIntent=new Intent("LOC_OBTAINED");
+        mPendingIntent=PendingIntent.getBroadcast(this,0,mIntent,0);
+        registerReceiver(new BroadcastReceiver(){
+            public void onReceive(Context arg0, Intent arg1)
+            {
+            	Bundle bundle=arg1.getExtras();
+                Location location=(Location)bundle.get(LocationManager.KEY_LOCATION_CHANGED);
+              	onLocationChanged(location);
+            }
+           },new IntentFilter("LOC_OBTAINED"));
 
         mLocationTimer.scheduleAtFixedRate(new LocationCheck(), 0, LOCATION_TIMER_RATE);
         mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -166,7 +181,7 @@ public class ActivityService extends Service implements SensorEventListener,Loca
     	
     	if(!mHaveHomeLoc) {
  		   mNextLocIsHome=true;
- 		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, _this, null);
+ 		   locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, mPendingIntent);
     	}
     }
     
@@ -189,7 +204,7 @@ public class ActivityService extends Service implements SensorEventListener,Loca
         		triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
         	} else {
         		Log.d("BLAH", "Triggering location check");
-        		locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, _this, null);
+        		locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, mPendingIntent);
         	}
         }
     }   
@@ -313,7 +328,5 @@ public class ActivityService extends Service implements SensorEventListener,Loca
 	@Override
 	public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 	public static void setMainActivity(Interface activity) { mMainActivity = activity; }
-    public void onStatusChanged(String provider, int status, Bundle extras) {}
-    public void onProviderEnabled(String provider) {}
-    public void onProviderDisabled(String provider) {}
+
 }
