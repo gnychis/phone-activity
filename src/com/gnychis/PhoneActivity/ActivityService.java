@@ -59,7 +59,7 @@ public class ActivityService extends Service implements SensorEventListener {
     public final int LOCATION_TOLERANCE=100;		// in meters
     public final int LOCATION_TIMER_RATE=120000; //900000;	// in milliseconds (15 minutes)
     public final int SEND_UPDATE_DELAY=20;	// in seconds
-    private final boolean DEBUG=true;
+    private final boolean DEBUG=false;
     
     private final String DATA_FILENAME="pa_data.json";
     private FileOutputStream data_ostream;
@@ -199,7 +199,6 @@ public class ActivityService extends Service implements SensorEventListener {
     // (which is NEVER sent back to us, it's only kept locally on the user's phone), 
     // then we save it in the application preferences.
     private void home() {
-    	Log.d("BLAH", "Marked as being home");
     	if(!mPhoneIsInTheHome) mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
     	mPhoneIsInTheHome=true;
     	
@@ -211,7 +210,6 @@ public class ActivityService extends Service implements SensorEventListener {
     
     // The user's phone is not in the home based on localization information.
     private void notHome() {
-    	Log.d("BLAH", "Marked as no longer being home");
     	if(mPhoneIsInTheHome) mSensorManager.unregisterListener(_this);
     	if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
     	mPhoneIsInTheHome=false;
@@ -226,10 +224,8 @@ public class ActivityService extends Service implements SensorEventListener {
         	mHaveHomeLoc=settings.getBoolean("haveHomeLoc", false);
         	if(!mHaveHomeLoc) {
         		mPhoneIsInTheHome=false;	// Phone can't be in the home if we don't have the location
-        		Log.d("BLAH", "Triggering wifi scan");
         		triggerScan(!wifi.isWifiEnabled());	// Trigger a scan
         	} else {
-        		Log.d("BLAH", "Triggering location check");
         		locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, mPendingIntent);
 				
 				// If it's been 6 hours since the last update, sending anonymous information, let's do it.
@@ -268,7 +264,6 @@ public class ActivityService extends Service implements SensorEventListener {
 	// we check the distance of the current location with the home location to detect if the user's
 	// phone is in their home.
     public void onLocationChanged(Location location) {
-    	Log.d("BLAH", "Location accuracy is: " + location.getAccuracy());
     	if(mNextLocIsHome) {
     		mHaveHomeLoc=true;
     		sEditor.putBoolean("haveHomeLoc", true);
@@ -278,13 +273,9 @@ public class ActivityService extends Service implements SensorEventListener {
     		mNextLocIsHome=false;
     		sEditor.putString("lastUpdate", (new Date()).toString());
     		sEditor.commit();
-    		Log.d("BLAH", "Recorded home location as: (" + location.getLatitude() + "," + location.getLongitude() + ")");
     	}
     	
     	if(mHaveHomeLoc) {
-    		Log.d("BLAH", "Home Location: (" + mHomeLoc.getLatitude() + "," + mHomeLoc.getLongitude() + ")");
-    		Log.d("BLAH", "Current Location: (" + location.getLatitude() + "," + location.getLongitude() + ")");
-        	Log.d("BLAH", "Distance is: " + mHomeLoc.distanceTo(location));
     		if(mHomeLoc.distanceTo(location)<=LOCATION_TOLERANCE)
     			home();
     		else
@@ -350,9 +341,7 @@ public class ActivityService extends Service implements SensorEventListener {
 					data_ostream.write(new JSONObject(state).toString().getBytes());
 					data_ostream.write("\n".getBytes());
 				}
-			} catch(Exception e) {
-				Log.e("BLAH", "Exception on time: " + e.toString());
-			}	
+			} catch(Exception e) { }	
 		}
 	}
 	
@@ -392,9 +381,7 @@ public class ActivityService extends Service implements SensorEventListener {
 	                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
                         }
                     }
-                } catch(Exception e){
-                	Log.e("BLAH", "Exception handling HTTP data: " + e);
-                }
+                } catch(Exception e){ }
                 Looper.loop(); //Loop in the message queue
             }
         };
