@@ -384,11 +384,10 @@ public class ActivityService extends Service implements SensorEventListener {
                     if(response!=null) {
                         InputStream in = response.getEntity().getContent();
                         String a = Interface.convertStreamToString(in);
+                        // Now we can overwrite the local file so it doesn't grow too large.
+                        data_ostream.close();
+                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
                     }
-                    
-                    // Now we can overwrite the local file so it doesn't grow too large.
-                    data_ostream.close();
-                    data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
                 } catch(Exception e){}
                 Looper.loop(); //Loop in the message queue
             }
