@@ -57,7 +57,8 @@ public class ActivityService extends Service implements SensorEventListener {
     Intent mIntent;
 
     public final int LOCATION_TOLERANCE=100;		// in meters
-    public final int LOCATION_TIMER_RATE=900000;	// in milliseconds (15 minutes)
+    public final int LOCATION_TIMER_RATE=120000; //900000;	// in milliseconds (15 minutes)
+    public final int SEND_UPDATE_DELAY=20;	// in seconds
     private final boolean DEBUG=true;
     
     private final String DATA_FILENAME="pa_data.json";
@@ -174,11 +175,9 @@ public class ActivityService extends Service implements SensorEventListener {
         registerReceiver(new BroadcastReceiver(){
             public void onReceive(Context arg0, Intent arg1)
             {
-            	if(arg1.getAction().equals(LocationManager.KEY_LOCATION_CHANGED)) {
-	            	Bundle bundle=arg1.getExtras();
-	                Location location=(Location)bundle.get(LocationManager.KEY_LOCATION_CHANGED);
-	              	onLocationChanged(location);
-            	}
+            	Bundle bundle=arg1.getExtras();
+                Location location=(Location)bundle.get(LocationManager.KEY_LOCATION_CHANGED);
+              	onLocationChanged(location);
             }
            },new IntentFilter("LOC_OBTAINED"));
 
@@ -230,6 +229,20 @@ public class ActivityService extends Service implements SensorEventListener {
         	} else {
         		Log.d("BLAH", "Triggering location check");
         		locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, mPendingIntent);
+				
+				// If it's been 6 hours since the last update, sending anonymous information, let's do it.
+				String lu = settings.getString("lastUpdate", null);
+				if(lu!=null) {
+					@SuppressWarnings("deprecation")
+					Date lastUpdate = new Date(lu);
+					Date currTime = new Date();
+					long timeDiff = TimeUnit.MILLISECONDS.toSeconds(currTime.getTime() - lastUpdate.getTime());
+					if(timeDiff>SEND_UPDATE_DELAY) {
+						sEditor.putString("lastUpdate", (new Date()).toString());
+						sEditor.commit();
+						sendUpdate();
+					}
+				}
         	}
         }
     }   
@@ -315,7 +328,9 @@ public class ActivityService extends Service implements SensorEventListener {
 			
 			// Store data about the phone's state
 			try {
-				// Store the current state
+				// Store the current state.  This is the only information set back to us.  Note that this are no identifiers
+				// other than your random client ID.  Your network name is not sent back to us, and neither is your location
+				// information.  
 				final Intent batteryIntent = getApplicationContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 				boolean isCharging = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING;
 				Map<String,Object> state = new HashMap<String, Object>();
@@ -333,26 +348,13 @@ public class ActivityService extends Service implements SensorEventListener {
 					data_ostream.write(new JSONObject(state).toString().getBytes());
 					data_ostream.write("\n".getBytes());
 				}
-				
-				// If it's been 6 hours since the last update, do it now
-				String lu = settings.getString("lastUpdate", null);
-				if(lu!=null) {
-					@SuppressWarnings("deprecation")
-					Date lastUpdate = new Date(lu);
-					Date currTime = new Date();
-					long timeDiff = TimeUnit.MILLISECONDS.toSeconds(currTime.getTime() - lastUpdate.getTime());
-					if(timeDiff>120) {
-						sEditor.putString("lastUpdate", (new Date()).toString());
-						sEditor.commit();
-						sendUpdate();
-					}
-				}
 			} catch(Exception e) {
 				Log.e("BLAH", "Exception on time: " + e.toString());
 			}	
 		}
 	}
 	
+	// This sends 
 	public void sendUpdate() {
         Thread t = new Thread(){
         public void run() {
@@ -364,8 +366,6 @@ public class ActivityService extends Service implements SensorEventListener {
                 try{
                     HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
                     
-                    // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
-                    // Note that your home network name is never sent to us.
                     json.put("clientID", settings.getInt("randClientID",-1));
                     FileInputStream finput = openFileInput(DATA_FILENAME);
                     InputStreamReader inputStreamReader = new InputStreamReader(finput);
@@ -373,7 +373,7 @@ public class ActivityService extends Service implements SensorEventListener {
                     StringBuilder sb = new StringBuilder();
                     String line;
                     while ((line = bufferedReader.readLine()) != null) {
-                        sb.append(line);
+                        sb.append(line + "\n");
                     } 
                    json.put("data", sb.toString());
                     
@@ -385,6 +385,10 @@ public class ActivityService extends Service implements SensorEventListener {
                         InputStream in = response.getEntity().getContent();
                         String a = Interface.convertStreamToString(in);
                     }
+                    
+                    // Now we can overwrite the local file so it doesn't grow too large.
+                    data_ostream.close();
+                    data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
                 } catch(Exception e){}
                 Looper.loop(); //Loop in the message queue
             }
@@ -398,6 +402,8 @@ public class ActivityService extends Service implements SensorEventListener {
     	cleanup();
     }
     
+    // When the phone is being shut down or the application is being destroyed, we perform a cleanup
+    // action and note the change in state of the phone.
     private void cleanup() {
     	try {
     		JSONObject jstate = new JSONObject();
