@@ -150,51 +150,9 @@ public class Interface extends Activity {
     	sEditor.putInt("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
     	sEditor.putInt("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);
     	sEditor.commit();
-    	sendUserData();
     	wifi.startScan();
     	finish();
     }
-    
-    // This sends us your optional "survey" like results.  It does so anonymously by accompanying them
-    // with a unique but random ID.  Note that your home network name or location are NOT transmitted
-    // back to us.  
-    protected void sendUserData() {
-        Thread t = new Thread(){
-        public void run() {
-                Looper.prepare(); // For Preparing Message Pool for the child Thread
-                HttpClient client = new DefaultHttpClient();
-                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
-                HttpResponse response;
-                JSONObject json = new JSONObject();
-                try{
-                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/survey.php");
-                    
-                    // We only retrieve your random user ID (for uniqueness) age range, and where your phone has been...
-                    // Note that your home network name is never sent to us.
-                    json.put("clientID", settings.getInt("randClientID",-1));
-                    json.put("ageRange", agelist.getSelectedItemId());
-                    json.put("kitchen", (((CheckBox) findViewById(R.id.kitchen)).isChecked()==true) ? 1 : 0);
-                    json.put("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);
-                    json.put("livingRoom", (((CheckBox) findViewById(R.id.livingRoom)).isChecked()==true) ? 1 : 0);
-                    json.put("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
-                    json.put("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);    
-                     
-                    
-                    StringEntity se = new StringEntity( json.toString());  
-                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
-                    post.setEntity(se);
-                    response = client.execute(post);
-                    if(response!=null) {
-                        InputStream in = response.getEntity().getContent();
-                        String a = convertStreamToString(in);
-                    }
-                } catch(Exception e){}
-                Looper.loop(); //Loop in the message queue
-            }
-        };
-        t.start();      
-    }
-
 	 
     // This is a comparator to sort the networks on your phone, so that your home network is
     // more likely to be at the top of the list.

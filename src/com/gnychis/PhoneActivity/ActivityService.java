@@ -46,6 +46,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
+import android.widget.CheckBox;
 
 public class ActivityService extends Service implements SensorEventListener {
 	
@@ -57,8 +58,8 @@ public class ActivityService extends Service implements SensorEventListener {
     Intent mIntent;
 
     public final int LOCATION_TOLERANCE=100;		// in meters
-    public final int LOCATION_TIMER_RATE=120000; //900000;	// in milliseconds (15 minutes)
-    public final int SEND_UPDATE_DELAY=20;	// in seconds
+    public final int LOCATION_TIMER_RATE=900000;	// in milliseconds (15 minutes)
+    public final int SEND_UPDATE_DELAY=21600;		// in seconds (6 hours)
     private final boolean DEBUG=false;
     
     private final String DATA_FILENAME="pa_data.json";
@@ -189,6 +190,13 @@ public class ActivityService extends Service implements SensorEventListener {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
     		jstate.put("state","on");
+            jstate.put("clientID", settings.getInt("randClientID",-1));
+            jstate.put("ageRange", settings.getInt("ageRange", -1));
+            jstate.put("kitchen", settings.getInt("kitchen",-1));
+            jstate.put("bedroom", settings.getInt("bedroom",-1));
+            jstate.put("livingRoom", settings.getInt("livingRoom",-1));
+            jstate.put("bathroom", settings.getInt("bathroom", -1));
+            jstate.put("everywhere", settings.getInt("everywhere",-1));
 			data_ostream.write(jstate.toString().getBytes());
 			data_ostream.write("\n".getBytes()); 
         } catch (Exception e) { }
@@ -401,6 +409,13 @@ public class ActivityService extends Service implements SensorEventListener {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
     		jstate.put("state","off");
+            jstate.put("clientID", settings.getInt("randClientID",-1));
+            jstate.put("ageRange", settings.getInt("ageRange", -1));
+            jstate.put("kitchen", settings.getInt("kitchen",-1));
+            jstate.put("bedroom", settings.getInt("bedroom",-1));
+            jstate.put("livingRoom", settings.getInt("livingRoom",-1));
+            jstate.put("bathroom", settings.getInt("bathroom", -1));
+            jstate.put("everywhere", settings.getInt("everywhere",-1));
 			data_ostream.write(jstate.toString().getBytes());
 			data_ostream.write("\n".getBytes());   		
     		data_ostream.close();
