@@ -1,16 +1,16 @@
 package com.gnychis.PhoneActivity;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpResponse;
@@ -56,8 +56,8 @@ public class ActivityService extends Service implements SensorEventListener {
     Intent mIntent;
 
     public final int LOCATION_TOLERANCE=100;			// in meters
-    public final int LOCATION_UPDATE_INTERVAL=900000;	// in milliseconds (15 minutes)
-    public final int SEND_UPDATE_DELAY=21600;			// in seconds (6 hours)
+    public final int LOCATION_UPDATE_INTERVAL=120000; //900000;	// in milliseconds (15 minutes)
+    public final int SEND_UPDATE_DELAY=60; //21600;			// in seconds (6 hours)
     private final boolean DEBUG=false;
     
     private final String DATA_FILENAME="pa_data.json";
@@ -94,6 +94,7 @@ public class ActivityService extends Service implements SensorEventListener {
     private static Timer mLocationTimer = new Timer(); 
     
     Map<String,Object> mLastState;
+    Semaphore _data_lock;
     
     @Override
     public void onCreate() {
@@ -108,6 +109,8 @@ public class ActivityService extends Service implements SensorEventListener {
     	mDisableWifiAS=false;			// Initialize "disable wifi after scan"
     	mScansLeft=0;					// Do not initialize with any scans
     	mPhoneIsInTheHome=false;		// To detect when the user is home
+    	
+    	_data_lock = new Semaphore(1,true);
     	
     	// Set up listeners to detect movement of the phone
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -332,6 +335,7 @@ public class ActivityService extends Service implements SensorEventListener {
 			
 			// Store data about the phone's state
 			try {
+				_data_lock.acquire();
 				// Store the current state.  This is the only information set back to us.  Note that this are no identifiers
 				// other than your random client ID.  Your network name is not sent back to us, and neither is your location
 				// information.  
@@ -352,6 +356,8 @@ public class ActivityService extends Service implements SensorEventListener {
 					data_ostream.write(new JSONObject(state).toString().getBytes());
 					data_ostream.write("\n".getBytes());
 				}
+				data_ostream.flush();
+				_data_lock.release();
 			} catch(Exception e) { }	
 		}
 	}
@@ -361,36 +367,36 @@ public class ActivityService extends Service implements SensorEventListener {
         Thread t = new Thread(){
         public void run() {
                 Looper.prepare(); // For Preparing Message Pool for the child Thread
-                HttpClient client = new DefaultHttpClient();
-                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
-                HttpResponse response;
-                JSONObject json = new JSONObject();
                 try{
-                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
+                	// Setup the input from the file
+                	char[] buffer = new char[1024 * 8];
+                    BufferedReader bufferedReader = new BufferedReader(new FileReader(DATA_FILENAME));
                     
-                    json.put("clientID", settings.getInt("randClientID",-1));
-                    FileInputStream finput = openFileInput(DATA_FILENAME);
-                    InputStreamReader inputStreamReader = new InputStreamReader(finput);
-                    BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = bufferedReader.readLine()) != null) {
-                        sb.append(line + "\n");
-                    } 
-                   json.put("data", sb.toString());
-                    
-                    StringEntity se = new StringEntity( json.toString());  
-                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
-                    post.setEntity(se);
-                    response = client.execute(post);
-                    if(response!=null) {
-                        InputStream in = response.getEntity().getContent();
-                        String a = Interface.convertStreamToString(in);
-                        if(a.replace("\n", "").equals("OK")) {
-	                        // Now we can overwrite the local file so it doesn't grow too large.
-	                        data_ostream.close();
-	                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
-                        }
+                    while(bufferedReader.read(buffer, 0, buffer.length)!=-1) {
+                    	                    
+	                    HttpClient client = new DefaultHttpClient();
+	                    HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
+	                    HttpResponse response;
+	                    JSONObject json = new JSONObject();
+	                	
+	                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
+	                    
+	                    json.put("clientID", settings.getInt("randClientID",-1));
+	                    json.put("data", buffer.toString());
+	                    
+	                    StringEntity se = new StringEntity( json.toString());  
+	                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
+	                    post.setEntity(se);
+	                    response = client.execute(post);
+	                    if(response!=null) {
+	                        InputStream in = response.getEntity().getContent();
+	                        String a = Interface.convertStreamToString(in);
+	                        if(a.replace("\n", "").equals("OK")) {
+		                        // Now we can overwrite the local file so it doesn't grow too large.
+		                        data_ostream.close();
+		                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
+	                        }
+	                    }
                     }
                 } catch(Exception e){ }
                 Looper.loop(); //Loop in the message queue
