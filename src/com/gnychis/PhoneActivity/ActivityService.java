@@ -1,9 +1,10 @@
 package com.gnychis.PhoneActivity;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.util.Log;
 
 public class ActivityService extends Service implements SensorEventListener {
 	
@@ -56,8 +58,8 @@ public class ActivityService extends Service implements SensorEventListener {
     Intent mIntent;
 
     public final int LOCATION_TOLERANCE=100;			// in meters
-    public final int LOCATION_UPDATE_INTERVAL=120000; //900000;	// in milliseconds (15 minutes)
-    public final int SEND_UPDATE_DELAY=60; //21600;			// in seconds (6 hours)
+    public final int LOCATION_UPDATE_INTERVAL=900000;	// in milliseconds (15 minutes)
+    public final int SEND_UPDATE_DELAY=21600;			// in seconds (6 hours)
     private final boolean DEBUG=false;
     
     private final String DATA_FILENAME="pa_data.json";
@@ -202,6 +204,7 @@ public class ActivityService extends Service implements SensorEventListener {
 			data_ostream.write(jstate.toString().getBytes());
 			data_ostream.write("\n".getBytes()); 
         } catch (Exception e) { }
+        
     }
     
     private void changeUpdateInterval(long interval) {
@@ -367,10 +370,14 @@ public class ActivityService extends Service implements SensorEventListener {
         Thread t = new Thread(){
         public void run() {
                 Looper.prepare(); // For Preparing Message Pool for the child Thread
+            	boolean OK=true;
                 try{
+                	_data_lock.acquire();
                 	// Setup the input from the file
-                	char[] buffer = new char[1024 * 8];
-                    BufferedReader bufferedReader = new BufferedReader(new FileReader(DATA_FILENAME));
+                	char[] buffer = new char[1024 * 16];
+                	FileInputStream finput = openFileInput(DATA_FILENAME);
+                	InputStreamReader inputStreamReader = new InputStreamReader(finput);
+                	BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
                     
                     while(bufferedReader.read(buffer, 0, buffer.length)!=-1) {
                     	                    
@@ -382,7 +389,7 @@ public class ActivityService extends Service implements SensorEventListener {
 	                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
 	                    
 	                    json.put("clientID", settings.getInt("randClientID",-1));
-	                    json.put("data", buffer.toString());
+	                    json.put("data", new String(buffer));
 	                    
 	                    StringEntity se = new StringEntity( json.toString());  
 	                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
@@ -392,13 +399,25 @@ public class ActivityService extends Service implements SensorEventListener {
 	                        InputStream in = response.getEntity().getContent();
 	                        String a = Interface.convertStreamToString(in);
 	                        if(a.replace("\n", "").equals("OK")) {
-		                        // Now we can overwrite the local file so it doesn't grow too large.
-		                        data_ostream.close();
-		                        data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
+	                        	// Everything was OK, don't modify the OK variable here!
+	                        } else {
+	                        	OK=false;
 	                        }
+	                    } else {
+	                    	OK=false;
 	                    }
                     }
-                } catch(Exception e){ }
+                    _data_lock.release();
+                } catch(Exception e){ 
+                	Log.e("BLAH", "Exception sending update" + e);
+                	OK=false;
+                }
+                if(OK==true) {  // Sending all of the data went okay
+                	try {       // Now we can overwrite the local file so it doesn't grow too large.
+	                    data_ostream.close();
+	                    data_ostream = openFileOutput(DATA_FILENAME, Context.MODE_PRIVATE);
+                	} catch(Exception e) {}
+                }
                 Looper.loop(); //Loop in the message queue
             }
         };
