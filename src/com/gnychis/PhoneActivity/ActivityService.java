@@ -194,6 +194,7 @@ public class ActivityService extends Service implements SensorEventListener {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
     		jstate.put("state","on");
+    		jstate.put("phoneInHome", mPhoneIsInTheHome);
             jstate.put("clientID", settings.getInt("randClientID",-1));
             jstate.put("ageRange", settings.getInt("ageRange", -1));
             jstate.put("kitchen", settings.getInt("kitchen",-1));
@@ -217,7 +218,16 @@ public class ActivityService extends Service implements SensorEventListener {
     // (which is NEVER sent back to us, it's only kept locally on the user's phone), 
     // then we save it in the application preferences.
     private void home() {
-    	if(!mPhoneIsInTheHome) mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+    	if(!mPhoneIsInTheHome) {
+    		mSensorManager.registerListener(_this, mAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+    		try {
+	    		JSONObject jstate = new JSONObject();
+	    		jstate.put("type","home");
+	    		jstate.put("state",true);
+				data_ostream.write(jstate.toString().getBytes());
+				data_ostream.write("\n".getBytes()); 
+    		} catch(Exception e) {}
+    	}
     	mPhoneIsInTheHome=true;
     	
     	if(!mHaveHomeLoc) {
@@ -228,7 +238,16 @@ public class ActivityService extends Service implements SensorEventListener {
     
     // The user's phone is not in the home based on localization information.
     private void notHome() {
-    	if(mPhoneIsInTheHome) mSensorManager.unregisterListener(_this);
+    	if(mPhoneIsInTheHome) {
+    		mSensorManager.unregisterListener(_this);
+    		try {
+	    		JSONObject jstate = new JSONObject();
+	    		jstate.put("type","home");
+	    		jstate.put("state",false);
+				data_ostream.write(jstate.toString().getBytes());
+				data_ostream.write("\n".getBytes()); 
+    		} catch(Exception e) { }
+    	}
     	if(mMainActivity!=null && DEBUG) mMainActivity.theView.setBackgroundColor(Color.BLACK);
     	mPhoneIsInTheHome=false;
     }
@@ -291,6 +310,7 @@ public class ActivityService extends Service implements SensorEventListener {
     		mNextLocIsHome=false;
     		sEditor.putString("lastUpdate", (new Date()).toString());
     		sEditor.commit();
+    		home();
     		changeUpdateInterval(LOCATION_UPDATE_INTERVAL);  // Once we get the location, we slow down updates.
     	}
     	
@@ -444,13 +464,6 @@ public class ActivityService extends Service implements SensorEventListener {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
     		jstate.put("state","off");
-            jstate.put("clientID", settings.getInt("randClientID",-1));
-            jstate.put("ageRange", settings.getInt("ageRange", -1));
-            jstate.put("kitchen", settings.getInt("kitchen",-1));
-            jstate.put("bedroom", settings.getInt("bedroom",-1));
-            jstate.put("livingRoom", settings.getInt("livingRoom",-1));
-            jstate.put("bathroom", settings.getInt("bathroom", -1));
-            jstate.put("everywhere", settings.getInt("everywhere",-1));
 			data_ostream.write(jstate.toString().getBytes());
 			data_ostream.write("\n".getBytes());   		
     		data_ostream.close();

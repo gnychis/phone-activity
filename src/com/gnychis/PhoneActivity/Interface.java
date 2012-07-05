@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -21,13 +22,16 @@ import org.apache.http.protocol.HTTP;
 import org.json.JSONObject;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -42,6 +46,7 @@ public class Interface extends Activity {
     View theView;
     String home_ssid;
     WifiManager wifi;
+    boolean mLocSelect;
     SharedPreferences.Editor sEditor;
     SharedPreferences settings;
     CheckBox kitchen, livingRoom, bedroom, bathroom;
@@ -55,6 +60,7 @@ public class Interface extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         theView = findViewById(R.id.main_id);
+        mLocSelect=false;
         
         // Check if the user already selected some of this information in the application's
         // preferences.  If so, we put their information back so they don't reselect it.
@@ -129,6 +135,11 @@ public class Interface extends Activity {
         });
         
         wifi.setWifiEnabled(wifi_enabled);  // If the user had wifi disabled, re-disable it
+        
+        // Test if they have GPS enabled or disabled.  If it's disabled, we ask them to enable it to participate
+        String provider = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+        if (!provider.contains("network"))
+        	buildAlertMessageNoGps();  
     }
     
     // When the user clicks finished, we save some information locally.  The home network name is
@@ -197,6 +208,24 @@ public class Interface extends Activity {
         t.start();      
     }
 
+    private void buildAlertMessageNoGps() {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Your location services must be enabled for our study to work, do you want to enable them?\n\nIf you choose YES, you only need to enable 'Use wireless networks' and then click your back button.")
+               .setCancelable(false)
+               .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                   public void onClick(@SuppressWarnings("unused") final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
+                	   startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                   }
+               })
+               .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                   public void onClick(final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
+                       	dialog.cancel();
+                       	finish();
+                   }
+               });
+        final AlertDialog alert = builder.create();
+        alert.show();
+    }
 	 
     // This is a comparator to sort the networks on your phone, so that your home network is
     // more likely to be at the top of the list.
