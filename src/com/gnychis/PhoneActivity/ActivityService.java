@@ -280,6 +280,8 @@ public class ActivityService extends Service implements SensorEventListener {
 	// we check the distance of the current location with the home location to detect if the user's
 	// phone is in their home.
     public void onLocationChanged(Location location) {
+    	if(location==null)
+    		return;
     	if(mNextLocIsHome) {
     		mHaveHomeLoc=true;
     		sEditor.putBoolean("haveHomeLoc", true);
@@ -379,7 +381,11 @@ public class ActivityService extends Service implements SensorEventListener {
                 	InputStreamReader inputStreamReader = new InputStreamReader(finput);
                 	BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
                     
-                    while(bufferedReader.read(buffer, 0, buffer.length)!=-1) {
+                    while(true) {
+                    	
+                    	int nread = bufferedReader.read(buffer, 0, buffer.length);
+                    	if(nread==-1)
+                    		break;
                     	                    
 	                    HttpClient client = new DefaultHttpClient();
 	                    HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
@@ -389,7 +395,7 @@ public class ActivityService extends Service implements SensorEventListener {
 	                    HttpPost post = new HttpPost("http://moo.cmcl.cs.cmu.edu/pastudy/userdata.php");
 	                    
 	                    json.put("clientID", settings.getInt("randClientID",-1));
-	                    json.put("data", new String(buffer));
+	                    json.put("data", (new String(buffer)).substring(0, nread));
 	                    
 	                    StringEntity se = new StringEntity( json.toString());  
 	                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
@@ -411,6 +417,7 @@ public class ActivityService extends Service implements SensorEventListener {
                 } catch(Exception e){ 
                 	Log.e("BLAH", "Exception sending update" + e);
                 	OK=false;
+                	_data_lock.release();
                 }
                 if(OK==true) {  // Sending all of the data went okay
                 	try {       // Now we can overwrite the local file so it doesn't grow too large.
