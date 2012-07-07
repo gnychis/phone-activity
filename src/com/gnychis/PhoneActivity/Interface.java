@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Semaphore;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -36,8 +35,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.Spinner;
 
 public class Interface extends Activity {
@@ -120,19 +117,6 @@ public class Interface extends Activity {
         ((CheckBox) findViewById(R.id.bedroom)).setChecked((settings.getInt("bedroom",0)==0) ? false : true);
         ((CheckBox) findViewById(R.id.livingRoom)).setChecked((settings.getInt("livingRoom",0)==0) ? false : true);
         ((CheckBox) findViewById(R.id.bathroom)).setChecked((settings.getInt("bathroom",0)==0) ? false : true);
-        ((CheckBox) findViewById(R.id.everywhere)).setChecked((settings.getInt("everywhere",0)==0) ? false : true);
-        
-        // If the user puts a "checkmark" in the Everywhere option, we check all other boxes.
-        ((CheckBox) findViewById(R.id.everywhere)).setOnCheckedChangeListener(new OnCheckedChangeListener() {
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if ( isChecked ) {
-                	 ((CheckBox) findViewById(R.id.kitchen)).setChecked(true);
-                	 ((CheckBox) findViewById(R.id.bedroom)).setChecked(true);
-                	 ((CheckBox) findViewById(R.id.livingRoom)).setChecked(true);
-                	 ((CheckBox) findViewById(R.id.bathroom)).setChecked(true);
-                }
-            }
-        });
         
         wifi.setWifiEnabled(wifi_enabled);  // If the user had wifi disabled, re-disable it
         
@@ -159,7 +143,6 @@ public class Interface extends Activity {
     	sEditor.putInt("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);
     	sEditor.putInt("livingRoom", (((CheckBox) findViewById(R.id.livingRoom)).isChecked()==true) ? 1 : 0);
     	sEditor.putInt("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
-    	sEditor.putInt("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);
     	sEditor.commit();
     	sendUserData();
     	wifi.startScan();
@@ -188,7 +171,6 @@ public class Interface extends Activity {
                     json.put("bedroom", (((CheckBox) findViewById(R.id.bedroom)).isChecked()==true) ? 1 : 0);
                     json.put("livingRoom", (((CheckBox) findViewById(R.id.livingRoom)).isChecked()==true) ? 1 : 0);
                     json.put("bathroom", (((CheckBox) findViewById(R.id.bathroom)).isChecked()==true) ? 1 : 0);
-                    json.put("everywhere", (((CheckBox) findViewById(R.id.everywhere)).isChecked()==true) ? 1 : 0);    
                      
                     
                     StringEntity se = new StringEntity( json.toString());  

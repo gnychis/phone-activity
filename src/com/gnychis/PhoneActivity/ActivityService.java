@@ -201,7 +201,6 @@ public class ActivityService extends Service implements SensorEventListener {
             jstate.put("bedroom", settings.getInt("bedroom",-1));
             jstate.put("livingRoom", settings.getInt("livingRoom",-1));
             jstate.put("bathroom", settings.getInt("bathroom", -1));
-            jstate.put("everywhere", settings.getInt("everywhere",-1));
 			data_ostream.write(jstate.toString().getBytes());
 			data_ostream.write("\n".getBytes()); 
         } catch (Exception e) { }
