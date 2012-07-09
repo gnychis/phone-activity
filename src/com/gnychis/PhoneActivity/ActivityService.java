@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -271,8 +272,14 @@ public class ActivityService extends Service implements SensorEventListener {
 				// If it's been 6 hours since the last update, sending anonymous information, let's do it.
 				String lu = settings.getString("lastUpdate", null);
 				if(lu!=null) {
-					@SuppressWarnings("deprecation")
-					Date lastUpdate = new Date(lu);
+					Date lastUpdate = new Date();
+					try {
+					    SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy");
+					    lastUpdate = format.parse(lu);
+					} catch(Exception e) {
+						throw new IllegalArgumentException();
+					}
+					
 					Date currTime = new Date();
 					long timeDiff = TimeUnit.MILLISECONDS.toSeconds(currTime.getTime() - lastUpdate.getTime());
 					if(timeDiff>SEND_UPDATE_DELAY) {
