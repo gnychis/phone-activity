@@ -194,6 +194,8 @@ public class ActivityService extends Service implements SensorEventListener {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
     		jstate.put("state","on");
+			jstate.put("time", new Date());
+			jstate.put("millis", System.currentTimeMillis());
     		jstate.put("phoneInHome", mPhoneIsInTheHome);
             jstate.put("clientID", settings.getInt("randClientID",-1));
             jstate.put("ageRange", settings.getInt("ageRange", -1));
@@ -223,6 +225,8 @@ public class ActivityService extends Service implements SensorEventListener {
 	    		JSONObject jstate = new JSONObject();
 	    		jstate.put("type","home");
 	    		jstate.put("state",true);
+				jstate.put("time", new Date());
+				jstate.put("millis", System.currentTimeMillis());
 				data_ostream.write(jstate.toString().getBytes());
 				data_ostream.write("\n".getBytes()); 
     		} catch(Exception e) {}
@@ -243,6 +247,8 @@ public class ActivityService extends Service implements SensorEventListener {
 	    		JSONObject jstate = new JSONObject();
 	    		jstate.put("type","home");
 	    		jstate.put("state",false);
+				jstate.put("time", new Date());
+				jstate.put("millis", System.currentTimeMillis());
 				data_ostream.write(jstate.toString().getBytes());
 				data_ostream.write("\n".getBytes()); 
     		} catch(Exception e) { }
@@ -463,6 +469,8 @@ public class ActivityService extends Service implements SensorEventListener {
     		JSONObject jstate = new JSONObject();
     		jstate.put("type","state");
     		jstate.put("state","off");
+			jstate.put("time", new Date());
+			jstate.put("millis", System.currentTimeMillis());
 			data_ostream.write(jstate.toString().getBytes());
 			data_ostream.write("\n".getBytes());   		
     		data_ostream.close();
