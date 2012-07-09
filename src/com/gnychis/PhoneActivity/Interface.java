@@ -20,6 +20,8 @@ import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.protocol.HTTP;
 import org.json.JSONObject;
 
+import com.nullwire.trace.ExceptionHandler;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -58,6 +60,8 @@ public class Interface extends Activity {
         setContentView(R.layout.main);
         theView = findViewById(R.id.main_id);
         mLocSelect=false;
+        
+        ExceptionHandler.register(this, "http://moo.cmcl.cs.cmu.edu/pastudy/"); 
         
         // Check if the user already selected some of this information in the application's
         // preferences.  If so, we put their information back so they don't reselect it.

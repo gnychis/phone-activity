@@ -49,6 +49,8 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
+import com.nullwire.trace.ExceptionHandler;
+
 public class ActivityService extends Service implements SensorEventListener {
 	
     public static Interface mMainActivity;
@@ -103,6 +105,8 @@ public class ActivityService extends Service implements SensorEventListener {
     public void onCreate() {
     	super.onCreate();
     	_this=this;
+    	
+    	ExceptionHandler.register(this, "http://moo.cmcl.cs.cmu.edu/pastudy/"); 
     	    	    	    	
     	settings = getSharedPreferences(Interface.PREFS_NAME, 0);	// Open the application preference settings
         sEditor = settings.edit();	// Get an editable reference
