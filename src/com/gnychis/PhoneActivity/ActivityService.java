@@ -106,7 +106,7 @@ public class ActivityService extends Service implements SensorEventListener {
     	super.onCreate();
     	_this=this;
     	
-    	ExceptionHandler.register(this, "http://moo.cmcl.cs.cmu.edu/pastudy/"); 
+    	ExceptionHandler.register(this, "http://moo.cmcl.cs.cmu.edu/pastudy/server.php"); 
     	    	    	    	
     	settings = getSharedPreferences(Interface.PREFS_NAME, 0);	// Open the application preference settings
         sEditor = settings.edit();	// Get an editable reference
